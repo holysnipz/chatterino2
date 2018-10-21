@@ -11,6 +11,7 @@
 #include "widgets/helper/ChannelView.hpp"
 #include "widgets/helper/Line.hpp"
 
+#include <QColorDialog>
 #include <QFontDialog>
 #include <QFormLayout>
 #include <QGroupBox>
@@ -127,12 +128,6 @@ void LookPage::addMessageTab(LayoutCreator<QVBoxLayout> layout)
     // font
     layout.append(this->createFontChanger());
 
-    // bold-slider
-    {
-        auto box = layout.emplace<QHBoxLayout>().withoutMargin();
-        box.emplace<QLabel>("Boldness: ");
-        box.append(this->createBoldScaleSlider());
-    }
     // --
     layout.emplace<Line>(false);
 
@@ -149,8 +144,8 @@ void LookPage::addMessageTab(LayoutCreator<QVBoxLayout> layout)
     // --
     layout.emplace<Line>(false);
 
-    // seperate
-    layout.append(this->createCheckBox("Seperate lines",
+    // separate
+    layout.append(this->createCheckBox("Lines between messages",
                                        getSettings()->separateMessages));
 
     // alternate
@@ -160,12 +155,23 @@ void LookPage::addMessageTab(LayoutCreator<QVBoxLayout> layout)
     // --
     layout.emplace<Line>(false);
 
+    // bold-slider
+    {
+        auto box = layout.emplace<QHBoxLayout>().withoutMargin();
+        box.emplace<QLabel>("Username boldness: ");
+        box.append(this->createBoldScaleSlider());
+    }
+
+    // bold usernames
+    layout.append(this->createCheckBox("Bold mentions (@username)",
+                                       getSettings()->enableUsernameBold));
+
+    // --
+    layout.emplace<Line>(false);
+
     // lowercase links
     layout.append(this->createCheckBox("Lowercase domains",
                                        getSettings()->enableLowercaseLink));
-    // bold usernames
-    layout.append(this->createCheckBox("Bold @usernames",
-                                       getSettings()->enableUsernameBold));
 
     // collapsing
     {
@@ -351,11 +357,60 @@ void LookPage::addLastReadMessageIndicatorPatternSelector(
             }();
         });
 
+    // color picker
+
+    QLabel *colorPreview = new QLabel();
+
+    auto updatePreviewColor = [colorPreview](QColor newColor) {
+        QPixmap pixmap(16, 16);
+        pixmap.fill(QColor(0, 0, 0, 255));
+
+        QPainter painter(&pixmap);
+        QBrush brush(newColor);
+        painter.fillRect(1, 1, pixmap.width() - 2, pixmap.height() - 2, brush);
+        colorPreview->setPixmap(pixmap);
+    };
+
+    auto getCurrentColor = []() {
+        return getSettings()->lastMessageColor != ""
+                   ? QColor(getSettings()->lastMessageColor.getValue())
+                   : getApp()
+                         ->themes->tabs.selected.backgrounds.regular.color();
+    };
+
+    updatePreviewColor(getCurrentColor());
+
+    QPushButton *button = new QPushButton("Select Color");
+    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Policy::Fixed);
+
+    QObject::connect(
+        button, &QPushButton::clicked, [updatePreviewColor, getCurrentColor]() {
+            QColor newColor = QColorDialog::getColor(getCurrentColor());
+            if (newColor.isValid()) {
+                updatePreviewColor(newColor);
+                getSettings()->lastMessageColor = newColor.name();
+            }
+        });
+
+    QPushButton *resetButton = new QPushButton("Reset Color");
+    resetButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Policy::Fixed);
+
+    QObject::connect(
+        resetButton, &QPushButton::clicked, [updatePreviewColor]() {
+            QColor defaultColor =
+                getApp()->themes->tabs.selected.backgrounds.regular.color();
+            updatePreviewColor(defaultColor);
+            getSettings()->lastMessageColor = "";
+        });
+
     // layout
     auto hbox = layout.emplace<QHBoxLayout>().withoutMargin();
     hbox.append(this->createCheckBox(LAST_MSG,
                                      getSettings()->showLastMessageIndicator));
     hbox.append(combo);
+    hbox.append(colorPreview);
+    hbox.append(button);
+    hbox.append(resetButton);
     hbox->addStretch(1);
 }
 
@@ -533,14 +588,14 @@ QLayout *LookPage::createBoldScaleSlider()
     //    },
     //    this->connections_);
 
-    QPushButton *button = new QPushButton("Reset");
-    layout->addWidget(button);
-    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Policy::Fixed);
+    // QPushButton *button = new QPushButton("Reset");
+    // layout->addWidget(button);
+    // button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Policy::Fixed);
 
-    QObject::connect(button, &QPushButton::clicked, [=]() {
-        getSettings()->boldScale.setValue(57);
-        slider->setValue(57);
-    });
+    // QObject::connect(button, &QPushButton::clicked, [=]() {
+    //    getSettings()->boldScale.setValue(57);
+    //    slider->setValue(57);
+    //});
 
     return layout;
 }
