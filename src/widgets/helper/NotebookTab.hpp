@@ -39,6 +39,8 @@ public:
     bool isSelected() const;
     void setSelected(bool value);
 
+    void setInLastRow(bool value);
+
     void setLive(bool isLive);
     void setHighlightState(HighlightState style);
     void setHighlightsEnabled(const bool &newVal);
@@ -47,7 +49,7 @@ public:
     void moveAnimated(QPoint pos, bool animated = true);
 
     QRect getDesiredRect() const;
-    void hideTabXChanged(bool);
+    void hideTabXChanged();
 
 protected:
     virtual void themeChangedEvent() override;
@@ -56,6 +58,7 @@ protected:
 
     virtual void mousePressEvent(QMouseEvent *event) override;
     virtual void mouseReleaseEvent(QMouseEvent *event) override;
+    virtual void mouseDoubleClickEvent(QMouseEvent *event) override;
     virtual void enterEvent(QEvent *) override;
     virtual void leaveEvent(QEvent *) override;
 
@@ -65,6 +68,8 @@ protected:
     virtual void wheelEvent(QWheelEvent *event) override;
 
 private:
+    void showRenameDialog();
+
     bool hasXButton();
     bool shouldDrawXButton();
     QRect getXRect();
@@ -79,11 +84,13 @@ private:
     QString customTitle_;
     QString defaultTitle_;
 
-    bool selected_ = false;
-    bool mouseOver_ = false;
-    bool mouseDown_ = false;
-    bool mouseOverX_ = false;
-    bool mouseDownX_ = false;
+    bool selected_{};
+    bool mouseOver_{};
+    bool mouseDown_{};
+    bool mouseOverX_{};
+    bool mouseDownX_{};
+    bool isInLastRow_{};
+    int mouseWheelDelta_ = 0;
 
     HighlightState highlightState_ = HighlightState::None;
     bool highlightEnabled_ = true;

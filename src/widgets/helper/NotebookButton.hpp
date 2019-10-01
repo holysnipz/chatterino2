@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Button.hpp"
+#include "widgets/helper/Button.hpp"
 
 #include <QWidget>
 
@@ -32,7 +32,7 @@ protected:
     virtual void showEvent(QShowEvent *) override;
 
 signals:
-    void clicked();
+    void leftClicked();
 
 private:
     Notebook *parent_ = nullptr;

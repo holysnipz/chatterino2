@@ -1,24 +1,31 @@
 #include "SelectChannelDialog.hpp"
 
 #include "Application.hpp"
-#include "providers/twitch/TwitchServer.hpp"
+#include "providers/twitch/TwitchIrcServer.hpp"
 #include "singletons/Theme.hpp"
 #include "util/LayoutCreator.hpp"
 #include "widgets/Notebook.hpp"
+#include "widgets/dialogs/IrcConnectionEditor.hpp"
 #include "widgets/helper/NotebookTab.hpp"
 
 #include <QDialogButtonBox>
+#include <QFormLayout>
 #include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QVBoxLayout>
 
+#include <QTableView>
+#include "providers/irc/Irc2.hpp"
+#include "widgets/helper/EditableModelView.hpp"
+
 #define TAB_TWITCH 0
+#define TAB_IRC 1
 
 namespace chatterino {
 
 SelectChannelDialog::SelectChannelDialog(QWidget *parent)
-    : BaseWindow(parent, BaseWindow::EnableCustomFrame)
+    : BaseWindow(BaseWindow::EnableCustomFrame, parent)
     , selectedChannel_(Channel::getEmpty())
 {
     this->setWindowTitle("Select a channel to join");
@@ -45,7 +52,8 @@ SelectChannelDialog::SelectChannelDialog(QWidget *parent)
 
         QObject::connect(channel_btn.getElement(), &QRadioButton::toggled,
                          [=](bool enabled) mutable {
-                             if (enabled) {
+                             if (enabled)
+                             {
                                  channel_edit->setFocus();
                                  channel_edit->setSelection(
                                      0, channel_edit->text().length());
@@ -115,20 +123,80 @@ SelectChannelDialog::SelectChannelDialog(QWidget *parent)
                              watching_btn.getElement());
 
         // tab
-        NotebookTab *tab = notebook->addPage(obj.getElement());
+        auto tab = notebook->addPage(obj.getElement());
         tab->setCustomTitle("Twitch");
     }
 
     // irc
-    /*{
+    {
         LayoutCreator<QWidget> obj(new QWidget());
-        auto vbox = obj.setLayoutType<QVBoxLayout>();
+        auto outerBox = obj.setLayoutType<QFormLayout>();
 
-        auto edit = vbox.emplace<QLabel>("not implemented");
+        {
+            auto view = this->ui_.irc.servers = new EditableModelView(
+                Irc::getInstance().newConnectionModel(this));
 
-        NotebookTab2 *tab = notebook->addPage(obj.getElement());
-        tab->setTitle("Irc");
-    }*/
+            view->setTitles({"host", "port", "ssl", "user", "nick", "real",
+                             "password", "login command"});
+            view->getTableView()->horizontalHeader()->resizeSection(0, 140);
+
+            view->getTableView()->horizontalHeader()->setSectionHidden(1, true);
+            view->getTableView()->horizontalHeader()->setSectionHidden(2, true);
+            view->getTableView()->horizontalHeader()->setSectionHidden(4, true);
+            view->getTableView()->horizontalHeader()->setSectionHidden(5, true);
+
+            view->addButtonPressed.connect([] {
+                auto unique = IrcServerData{};
+                unique.id = Irc::getInstance().uniqueId();
+
+                auto editor = new IrcConnectionEditor(unique);
+                if (editor->exec() == QDialog::Accepted)
+                {
+                    Irc::getInstance().connections.appendItem(editor->data());
+                }
+            });
+
+            QObject::connect(
+                view->getTableView(), &QTableView::doubleClicked,
+                [](const QModelIndex &index) {
+                    auto editor = new IrcConnectionEditor(
+                        Irc::getInstance()
+                            .connections.getVector()[size_t(index.row())]);
+
+                    if (editor->exec() == QDialog::Accepted)
+                    {
+                        auto data = editor->data();
+                        auto &&conns =
+                            Irc::getInstance().connections.getVector();
+                        int i = 0;
+                        for (auto &&conn : conns)
+                        {
+                            if (conn.id == data.id)
+                            {
+                                Irc::getInstance().connections.removeItem(
+                                    i, Irc::noEraseCredentialCaller);
+                                Irc::getInstance().connections.insertItem(data,
+                                                                          i);
+                            }
+                            i++;
+                        }
+                    }
+                });
+
+            outerBox->addRow("Server:", view);
+        }
+
+        outerBox->addRow("Channel:", this->ui_.irc.channel = new QLineEdit);
+
+        auto tab = notebook->addPage(obj.getElement());
+        tab->setCustomTitle("Irc (Beta)");
+
+        if (!getSettings()->enableExperimentalIrc)
+        {
+            tab->setEnable(false);
+            tab->setVisible(false);
+        }
+    }
 
     layout->setStretchFactor(notebook.getElement(), 1);
 
@@ -143,7 +211,7 @@ SelectChannelDialog::SelectChannelDialog(QWidget *parent)
                          [=](bool) { this->close(); });
     }
 
-    this->setScaleIndependantSize(300, 210);
+    this->setMinimumSize(300, 310);
     this->ui_.notebook->selectIndex(TAB_TWITCH);
     this->ui_.twitch.channel->setFocus();
 
@@ -153,10 +221,29 @@ SelectChannelDialog::SelectChannelDialog(QWidget *parent)
     auto *shortcut_cancel = new QShortcut(QKeySequence("Esc"), this);
     QObject::connect(shortcut_cancel, &QShortcut::activated,
                      [=] { this->close(); });
+
+    // restore ui state
+    // fourtf: enable when releasing irc
+    if (getSettings()->enableExperimentalIrc)
+    {
+        this->ui_.notebook->selectIndex(getSettings()->lastSelectChannelTab);
+    }
+
+    this->ui_.irc.servers->getTableView()->selectRow(
+        getSettings()->lastSelectIrcConn);
 }
 
 void SelectChannelDialog::ok()
 {
+    // save ui state
+    getSettings()->lastSelectChannelTab =
+        this->ui_.notebook->getSelectedIndex();
+    getSettings()->lastSelectIrcConn = this->ui_.irc.servers->getTableView()
+                                           ->selectionModel()
+                                           ->currentIndex()
+                                           .row();
+
+    // accept and close
     this->hasSelectedChannel_ = true;
     this->close();
 }
@@ -169,24 +256,54 @@ void SelectChannelDialog::setSelectedChannel(IndirectChannel _channel)
 
     this->selectedChannel_ = channel;
 
-    switch (_channel.getType()) {
+    switch (_channel.getType())
+    {
         case Channel::Type::Twitch: {
             this->ui_.notebook->selectIndex(TAB_TWITCH);
             this->ui_.twitch.channel->setFocus();
             this->ui_.twitch.channelName->setText(channel->getName());
-        } break;
+        }
+        break;
         case Channel::Type::TwitchWatching: {
             this->ui_.notebook->selectIndex(TAB_TWITCH);
             this->ui_.twitch.watching->setFocus();
-        } break;
+        }
+        break;
         case Channel::Type::TwitchMentions: {
             this->ui_.notebook->selectIndex(TAB_TWITCH);
             this->ui_.twitch.mentions->setFocus();
-        } break;
+        }
+        break;
         case Channel::Type::TwitchWhispers: {
             this->ui_.notebook->selectIndex(TAB_TWITCH);
             this->ui_.twitch.whispers->setFocus();
-        } break;
+        }
+        break;
+        case Channel::Type::Irc: {
+            this->ui_.notebook->selectIndex(TAB_IRC);
+            this->ui_.irc.channel->setText(_channel.get()->getName());
+
+            if (auto ircChannel =
+                    dynamic_cast<IrcChannel *>(_channel.get().get()))
+            {
+                if (auto server = ircChannel->server())
+                {
+                    int i = 0;
+                    for (auto &&conn : Irc::getInstance().connections)
+                    {
+                        if (conn.id == server->id())
+                        {
+                            this->ui_.irc.servers->getTableView()->selectRow(i);
+                            break;
+                        }
+                        i++;
+                    }
+                }
+            }
+
+            this->ui_.irc.channel->setFocus();
+        }
+        break;
         default: {
             this->ui_.notebook->selectIndex(TAB_TWITCH);
             this->ui_.twitch.channel->setFocus();
@@ -198,25 +315,54 @@ void SelectChannelDialog::setSelectedChannel(IndirectChannel _channel)
 
 IndirectChannel SelectChannelDialog::getSelectedChannel() const
 {
-    if (!this->hasSelectedChannel_) {
+    if (!this->hasSelectedChannel_)
+    {
         return this->selectedChannel_;
     }
 
     auto app = getApp();
 
-    switch (this->ui_.notebook->getSelectedIndex()) {
+    switch (this->ui_.notebook->getSelectedIndex())
+    {
         case TAB_TWITCH: {
-            if (this->ui_.twitch.channel->isChecked()) {
+            if (this->ui_.twitch.channel->isChecked())
+            {
                 return app->twitch.server->getOrAddChannel(
                     this->ui_.twitch.channelName->text().trimmed());
-            } else if (this->ui_.twitch.watching->isChecked()) {
+            }
+            else if (this->ui_.twitch.watching->isChecked())
+            {
                 return app->twitch.server->watchingChannel;
-            } else if (this->ui_.twitch.mentions->isChecked()) {
+            }
+            else if (this->ui_.twitch.mentions->isChecked())
+            {
                 return app->twitch.server->mentionsChannel;
-            } else if (this->ui_.twitch.whispers->isChecked()) {
+            }
+            else if (this->ui_.twitch.whispers->isChecked())
+            {
                 return app->twitch.server->whispersChannel;
             }
         }
+        break;
+        case TAB_IRC: {
+            int row = this->ui_.irc.servers->getTableView()
+                          ->selectionModel()
+                          ->currentIndex()
+                          .row();
+
+            auto &&vector = Irc::getInstance().connections.getVector();
+
+            if (row >= 0 && row < int(vector.size()))
+            {
+                return Irc::getInstance().getOrAddChannel(
+                    vector[size_t(row)].id, this->ui_.irc.channel->text());
+            }
+            else
+            {
+                return Channel::getEmpty();
+            }
+        }
+            //break;
     }
 
     return this->selectedChannel_;
@@ -230,56 +376,75 @@ bool SelectChannelDialog::hasSeletedChannel() const
 bool SelectChannelDialog::EventFilter::eventFilter(QObject *watched,
                                                    QEvent *event)
 {
-    auto *widget = (QWidget *)watched;
+    auto *widget = static_cast<QWidget *>(watched);
 
-    if (event->type() == QEvent::FocusIn) {
+    if (event->type() == QEvent::FocusIn)
+    {
         widget->grabKeyboard();
 
         auto *radio = dynamic_cast<QRadioButton *>(watched);
-        if (radio) {
+        if (radio)
+        {
             radio->setChecked(true);
         }
 
         return true;
-    } else if (event->type() == QEvent::FocusOut) {
+    }
+    else if (event->type() == QEvent::FocusOut)
+    {
         widget->releaseKeyboard();
         return false;
-    } else if (event->type() == QEvent::KeyPress) {
+    }
+    else if (event->type() == QEvent::KeyPress)
+    {
         QKeyEvent *event_key = static_cast<QKeyEvent *>(event);
         if ((event_key->key() == Qt::Key_Tab ||
              event_key->key() == Qt::Key_Down) &&
-            event_key->modifiers() == Qt::NoModifier) {
-            if (widget == this->dialog->ui_.twitch.channelName) {
+            event_key->modifiers() == Qt::NoModifier)
+        {
+            if (widget == this->dialog->ui_.twitch.channelName)
+            {
                 this->dialog->ui_.twitch.whispers->setFocus();
                 return true;
-            } else {
+            }
+            else
+            {
                 widget->nextInFocusChain()->setFocus();
             }
             return true;
-        } else if (((event_key->key() == Qt::Key_Tab ||
-                     event_key->key() == Qt::Key_Backtab) &&
-                    event_key->modifiers() == Qt::ShiftModifier) ||
-                   ((event_key->key() == Qt::Key_Up) &&
-                    event_key->modifiers() == Qt::NoModifier)) {
-            if (widget == this->dialog->ui_.twitch.channelName) {
+        }
+        else if (((event_key->key() == Qt::Key_Tab ||
+                   event_key->key() == Qt::Key_Backtab) &&
+                  event_key->modifiers() == Qt::ShiftModifier) ||
+                 ((event_key->key() == Qt::Key_Up) &&
+                  event_key->modifiers() == Qt::NoModifier))
+        {
+            if (widget == this->dialog->ui_.twitch.channelName)
+            {
                 this->dialog->ui_.twitch.watching->setFocus();
                 return true;
-            } else if (widget == this->dialog->ui_.twitch.whispers) {
+            }
+            else if (widget == this->dialog->ui_.twitch.whispers)
+            {
                 this->dialog->ui_.twitch.channel->setFocus();
                 return true;
             }
 
             widget->previousInFocusChain()->setFocus();
             return true;
-        } else {
+        }
+        else
+        {
             return false;
         }
-        return true;
-    } else if (event->type() == QEvent::KeyRelease) {
+    }
+    else if (event->type() == QEvent::KeyRelease)
+    {
         QKeyEvent *event_key = static_cast<QKeyEvent *>(event);
         if ((event_key->key() == Qt::Key_Backtab ||
              event_key->key() == Qt::Key_Down) &&
-            event_key->modifiers() == Qt::NoModifier) {
+            event_key->modifiers() == Qt::NoModifier)
+        {
             return true;
         }
     }
@@ -296,10 +461,13 @@ void SelectChannelDialog::themeChangedEvent()
 {
     BaseWindow::themeChangedEvent();
 
-    if (this->theme->isLightTheme()) {
+    if (this->theme->isLightTheme())
+    {
         this->setStyleSheet(
             "QRadioButton { color: #000 } QLabel { color: #000 }");
-    } else {
+    }
+    else
+    {
         this->setStyleSheet(
             "QRadioButton { color: #fff } QLabel { color: #fff }");
     }

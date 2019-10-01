@@ -1,5 +1,7 @@
 #include "AboutPage.hpp"
 
+#include "common/Modes.hpp"
+#include "common/Version.hpp"
 #include "debug/Log.hpp"
 #include "util/LayoutCreator.hpp"
 #include "util/RemoveScrollAreaBackground.hpp"
@@ -71,6 +73,26 @@ AboutPage::AboutPage()
             //            }
         }*/
 
+        auto versionInfo = layout.emplace<QGroupBox>("Version");
+        {
+            auto version = Version::getInstance();
+            QString text = QString("%1 (commit %2%3)")
+                               .arg(version.getFullVersion())
+                               .arg("<a "
+                                    "href=\"https://github.com/Chatterino/"
+                                    "chatterino2/commit/" +
+                                    version.getCommitHash() + "\">" +
+                                    version.getCommitHash() + "</a>")
+                               .arg(Modes::getInstance().isNightly
+                                        ? ", " + version.getDateOfBuild()
+                                        : "");
+
+            auto versionLabel = versionInfo.emplace<QLabel>(text);
+            versionLabel->setOpenExternalLinks(true);
+            versionLabel->setTextInteractionFlags(Qt::TextSelectableByMouse |
+                                                  Qt::LinksAccessibleByMouse);
+        }
+
         auto licenses =
             layout.emplace<QGroupBox>("Open source software used...");
         {
@@ -98,6 +120,9 @@ AboutPage::AboutPage()
             addLicense(form.getElement(), "Websocketpp",
                        "https://www.zaphoyd.com/websocketpp/",
                        ":/licenses/websocketpp.txt");
+            addLicense(form.getElement(), "QtKeychain",
+                       "https://github.com/frankosterfeld/qtkeychain",
+                       ":/licenses/qtkeychain.txt");
         }
 
         auto attributions = layout.emplace<QGroupBox>("Attributions...");
@@ -113,6 +138,7 @@ AboutPage::AboutPage()
             l.emplace<QLabel>("Messenger emojis provided by <a href=\"https://facebook.com\">Facebook</a>")->setOpenExternalLinks(true);
             l.emplace<QLabel>("Emoji datasource provided by <a href=\"https://www.iamcal.com/\">Cal Henderson</a>"
                               "(<a href=\"https://github.com/iamcal/emoji-data/blob/master/LICENSE\">show license</a>)")->setOpenExternalLinks(true);
+            l.emplace<QLabel>("Twitch emote data provided by <a href=\"https://twitchemotes.com/\">twitchemotes.com</a> through the <a href=\"https://github.com/Chatterino/api\">Chatterino API</a>")->setOpenExternalLinks(true);
             // clang-format on
         }
 
@@ -129,14 +155,17 @@ AboutPage::AboutPage()
 
             QString line;
 
-            while (stream.readLineInto(&line)) {
-                if (line.isEmpty() || line.startsWith('#')) {
+            while (stream.readLineInto(&line))
+            {
+                if (line.isEmpty() || line.startsWith('#'))
+                {
                     continue;
                 }
 
                 QStringList contributorParts = line.split("|");
 
-                if (contributorParts.size() != 4) {
+                if (contributorParts.size() != 4)
+                {
                     log("Missing parts in line '{}'", line);
                     continue;
                 }
@@ -154,7 +183,8 @@ AboutPage::AboutPage()
                 auto contributorBox2 = l.emplace<QHBoxLayout>();
 
                 const auto addAvatar = [&avatarUrl, &contributorBox2] {
-                    if (!avatarUrl.isEmpty()) {
+                    if (!avatarUrl.isEmpty())
+                    {
                         QPixmap avatarPixmap;
                         avatarPixmap.load(avatarUrl);
 
@@ -200,10 +230,8 @@ void AboutPage::addLicense(QFormLayout *form, const QString &name,
 {
     auto *a = new QLabel("<a href=\"" + website + "\">" + name + "</a>");
     a->setOpenExternalLinks(true);
-    auto *b = new SignalLabel();
-    b->setText("<a href=\"" + licenseLink + "\">show license</a>");
-    b->setCursor(Qt::PointingHandCursor);
-    QObject::connect(b, &SignalLabel::mouseUp, [licenseLink] {
+    auto *b = new QLabel("<a href=\"" + licenseLink + "\">show license</a>");
+    QObject::connect(b, &QLabel::linkActivated, [licenseLink] {
         auto *edit = new QTextEdit;
 
         QFile file(licenseLink);

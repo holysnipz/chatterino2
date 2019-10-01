@@ -1,7 +1,7 @@
 #include "singletons/NativeMessaging.hpp"
 
 #include "Application.hpp"
-#include "providers/twitch/TwitchServer.hpp"
+#include "providers/twitch/TwitchIrcServer.hpp"
 #include "singletons/Paths.hpp"
 #include "util/PostToThread.hpp"
 
@@ -12,6 +12,7 @@
 #include <QJsonObject>
 #include <QJsonValue>
 
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
 
 namespace ipc = boost::interprocess;
@@ -37,7 +38,8 @@ void registerNmManifest(Paths &paths, const QString &manifestFilename,
 
 void registerNmHost(Paths &paths)
 {
-    if (paths.isPortable()) return;
+    if (paths.isPortable())
+        return;
 
     auto getBaseDocument = [&] {
         QJsonObject obj;
@@ -112,11 +114,17 @@ std::string &getNmQueueName(Paths &paths)
 
 void NativeMessagingClient::sendMessage(const QByteArray &array)
 {
-    try {
+    try
+    {
         ipc::message_queue messageQueue(ipc::open_only, "chatterino_gui");
 
-        messageQueue.try_send(array.data(), array.size(), 1);
-    } catch (ipc::interprocess_exception &ex) {
+        messageQueue.try_send(array.data(), size_t(array.size()), 1);
+        //        messageQueue.timed_send(array.data(), size_t(array.size()), 1,
+        //                                boost::posix_time::second_clock::local_time() +
+        //                                    boost::posix_time::seconds(10));
+    }
+    catch (ipc::interprocess_exception &ex)
+    {
         qDebug() << "send to gui process:" << ex.what();
     }
 }
@@ -144,8 +152,10 @@ void NativeMessagingServer::ReceiverThread::run()
     ipc::message_queue messageQueue(ipc::open_or_create, "chatterino_gui", 100,
                                     MESSAGE_SIZE);
 
-    while (true) {
-        try {
+    while (true)
+    {
+        try
+        {
             auto buf = std::make_unique<char[]>(MESSAGE_SIZE);
             auto retSize = ipc::message_queue::size_type();
             auto priority = static_cast<unsigned int>(0);
@@ -156,7 +166,9 @@ void NativeMessagingServer::ReceiverThread::run()
                 QByteArray::fromRawData(buf.get(), retSize));
 
             this->handleMessage(document.object());
-        } catch (ipc::interprocess_exception &ex) {
+        }
+        catch (ipc::interprocess_exception &ex)
+        {
             qDebug() << "received from gui process:" << ex.what();
         }
     }
@@ -169,17 +181,20 @@ void NativeMessagingServer::ReceiverThread::handleMessage(
 
     QString action = root.value("action").toString();
 
-    if (action.isNull()) {
+    if (action.isNull())
+    {
         qDebug() << "NM action was null";
         return;
     }
 
-    if (action == "select") {
+    qDebug() << root;
+
+    if (action == "select")
+    {
         QString _type = root.value("type").toString();
         bool attach = root.value("attach").toBool();
+        bool attachFullscreen = root.value("attach_fullscreen").toBool();
         QString name = root.value("name").toString();
-
-        qDebug() << attach;
 
 #ifdef USEWINSDK
         AttachedWindow::GetArgs args;
@@ -187,27 +202,36 @@ void NativeMessagingServer::ReceiverThread::handleMessage(
         args.yOffset = root.value("yOffset").toInt(-1);
         args.width = root.value("size").toObject().value("width").toInt(-1);
         args.height = root.value("size").toObject().value("height").toInt(-1);
+        args.fullscreen = attachFullscreen;
 
-        if (_type.isNull() || args.winId.isNull()) {
+        qDebug() << args.width << args.height << args.winId;
+
+        if (_type.isNull() || args.winId.isNull())
+        {
             qDebug() << "NM type, name or winId missing";
             attach = false;
+            attachFullscreen = false;
             return;
         }
 #endif
 
-        if (_type == "twitch") {
+        if (_type == "twitch")
+        {
             postToThread([=] {
-                if (!name.isEmpty()) {
+                if (!name.isEmpty())
+                {
                     app->twitch.server->watchingChannel.reset(
                         app->twitch.server->getOrAddChannel(name));
                 }
 
-                if (attach) {
+                if (attach || attachFullscreen)
+                {
 #ifdef USEWINSDK
                     //                    if (args.height != -1) {
                     auto *window =
                         AttachedWindow::get(::GetForegroundWindow(), args);
-                    if (!name.isEmpty()) {
+                    if (!name.isEmpty())
+                    {
                         window->setChannel(
                             app->twitch.server->getOrAddChannel(name));
                     }
@@ -216,14 +240,18 @@ void NativeMessagingServer::ReceiverThread::handleMessage(
 #endif
                 }
             });
-
-        } else {
+        }
+        else
+        {
             qDebug() << "NM unknown channel type";
         }
-    } else if (action == "detach") {
+    }
+    else if (action == "detach")
+    {
         QString winId = root.value("winId").toString();
 
-        if (winId.isNull()) {
+        if (winId.isNull())
+        {
             qDebug() << "NM winId missing";
             return;
         }
@@ -234,7 +262,9 @@ void NativeMessagingServer::ReceiverThread::handleMessage(
             AttachedWindow::detach(winId);
         });
 #endif
-    } else {
+    }
+    else
+    {
         qDebug() << "NM unknown action " + action;
     }
 }

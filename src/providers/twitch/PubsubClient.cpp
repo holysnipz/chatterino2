@@ -51,19 +51,21 @@ namespace detail {
     {
         int numRequestedListens = message["data"]["topics"].Size();
 
-        if (this->numListens_ + numRequestedListens > MAX_PUBSUB_LISTENS) {
+        if (this->numListens_ + numRequestedListens > MAX_PUBSUB_LISTENS)
+        {
             // This PubSubClient is already at its peak listens
             return false;
         }
 
         this->numListens_ += numRequestedListens;
 
-        for (const auto &topic : message["data"]["topics"].GetArray()) {
+        for (const auto &topic : message["data"]["topics"].GetArray())
+        {
             this->listeners_.emplace_back(
                 Listener{topic.GetString(), false, false, false});
         }
 
-        auto uuid = CreateUUID();
+        auto uuid = generateUuid();
 
         rj::set(message, "nonce", uuid);
 
@@ -79,26 +81,30 @@ namespace detail {
     {
         std::vector<std::string> topics;
 
-        for (auto it = this->listeners_.begin();
-             it != this->listeners_.end();) {
+        for (auto it = this->listeners_.begin(); it != this->listeners_.end();)
+        {
             const auto &listener = *it;
-            if (listener.topic.find(prefix) == 0) {
+            if (listener.topic.find(prefix) == 0)
+            {
                 topics.push_back(listener.topic);
                 it = this->listeners_.erase(it);
-            } else {
+            }
+            else
+            {
                 ++it;
             }
         }
 
-        if (topics.empty()) {
+        if (topics.empty())
+        {
             return;
         }
 
         auto message = createUnlistenMessage(topics);
 
-        auto uuid = CreateUUID();
+        auto uuid = generateUuid();
 
-        rj::set(message, "nonce", CreateUUID());
+        rj::set(message, "nonce", generateUuid());
 
         std::string payload = rj::stringify(message);
         sentMessages[uuid] = payload;
@@ -117,8 +123,10 @@ namespace detail {
 
     bool PubSubClient::isListeningToTopic(const std::string &payload)
     {
-        for (const auto &listener : this->listeners_) {
-            if (listener.topic == payload) {
+        for (const auto &listener : this->listeners_)
+        {
+            if (listener.topic == payload)
+            {
                 return true;
             }
         }
@@ -130,7 +138,8 @@ namespace detail {
     {
         assert(this->started_);
 
-        if (!this->send(pingPayload)) {
+        if (!this->send(pingPayload))
+        {
             return;
         }
 
@@ -140,11 +149,13 @@ namespace detail {
 
         runAfter(this->websocketClient_.get_io_service(),
                  std::chrono::seconds(15), [self](auto timer) {
-                     if (!self->started_) {
+                     if (!self->started_)
+                     {
                          return;
                      }
 
-                     if (self->awaitingPong_) {
+                     if (self->awaitingPong_)
+                     {
                          log("No pong respnose, disconnect!");
                          // TODO(pajlada): Label this connection as "disconnect
                          // me"
@@ -153,7 +164,8 @@ namespace detail {
 
         runAfter(this->websocketClient_.get_io_service(),
                  std::chrono::minutes(5), [self](auto timer) {
-                     if (!self->started_) {
+                     if (!self->started_)
+                     {
                          return;
                      }
 
@@ -167,7 +179,8 @@ namespace detail {
         this->websocketClient_.send(this->handle_, payload,
                                     websocketpp::frame::opcode::text, ec);
 
-        if (ec) {
+        if (ec)
+        {
             log("Error sending message {}: {}", payload, ec.message());
             // TODO(pajlada): Check which error code happened and maybe
             // gracefully handle it
@@ -208,26 +221,30 @@ PubSub::PubSub()
         action.mode = ModeChangedAction::Mode::Slow;
         action.state = ModeChangedAction::State::On;
 
-        if (!data.HasMember("args")) {
+        if (!data.HasMember("args"))
+        {
             log("Missing required args member");
             return;
         }
 
         const auto &args = data["args"];
 
-        if (!args.IsArray()) {
+        if (!args.IsArray())
+        {
             log("args member must be an array");
             return;
         }
 
-        if (args.Size() == 0) {
+        if (args.Size() == 0)
+        {
             log("Missing duration argument in slowmode on");
             return;
         }
 
         const auto &durationArg = args[0];
 
-        if (!durationArg.IsString()) {
+        if (!durationArg.IsString())
+        {
             log("Duration arg must be a string");
             return;
         }
@@ -305,17 +322,22 @@ PubSub::PubSub()
 
         getTargetUser(data, action.target);
 
-        try {
+        try
+        {
             const auto &args = getArgs(data);
 
-            if (args.Size() < 1) {
+            if (args.Size() < 1)
+            {
                 return;
             }
 
-            if (!rj::getSafe(args[0], action.target.name)) {
+            if (!rj::getSafe(args[0], action.target.name))
+            {
                 return;
             }
-        } catch (const std::runtime_error &ex) {
+        }
+        catch (const std::runtime_error &ex)
+        {
             log("Error parsing moderation action: {}", ex.what());
         }
 
@@ -330,17 +352,22 @@ PubSub::PubSub()
 
         getTargetUser(data, action.target);
 
-        try {
+        try
+        {
             const auto &args = getArgs(data);
 
-            if (args.Size() < 1) {
+            if (args.Size() < 1)
+            {
                 return;
             }
 
-            if (!rj::getSafe(args[0], action.target.name)) {
+            if (!rj::getSafe(args[0], action.target.name))
+            {
                 return;
             }
-        } catch (const std::runtime_error &ex) {
+        }
+        catch (const std::runtime_error &ex)
+        {
             log("Error parsing moderation action: {}", ex.what());
         }
 
@@ -356,32 +383,40 @@ PubSub::PubSub()
         getCreatedByUser(data, action.source);
         getTargetUser(data, action.target);
 
-        try {
+        try
+        {
             const auto &args = getArgs(data);
 
-            if (args.Size() < 2) {
+            if (args.Size() < 2)
+            {
                 return;
             }
 
-            if (!rj::getSafe(args[0], action.target.name)) {
+            if (!rj::getSafe(args[0], action.target.name))
+            {
                 return;
             }
 
             QString durationString;
-            if (!rj::getSafe(args[1], durationString)) {
+            if (!rj::getSafe(args[1], durationString))
+            {
                 return;
             }
             bool ok;
             action.duration = durationString.toUInt(&ok, 10);
 
-            if (args.Size() >= 3) {
-                if (!rj::getSafe(args[2], action.reason)) {
+            if (args.Size() >= 3)
+            {
+                if (!rj::getSafe(args[2], action.reason))
+                {
                     return;
                 }
             }
 
             this->signals_.moderation.userBanned.invoke(action);
-        } catch (const std::runtime_error &ex) {
+        }
+        catch (const std::runtime_error &ex)
+        {
             log("Error parsing moderation action: {}", ex.what());
         }
     };
@@ -393,25 +428,32 @@ PubSub::PubSub()
         getCreatedByUser(data, action.source);
         getTargetUser(data, action.target);
 
-        try {
+        try
+        {
             const auto &args = getArgs(data);
 
-            if (args.Size() < 1) {
+            if (args.Size() < 1)
+            {
                 return;
             }
 
-            if (!rj::getSafe(args[0], action.target.name)) {
+            if (!rj::getSafe(args[0], action.target.name))
+            {
                 return;
             }
 
-            if (args.Size() >= 2) {
-                if (!rj::getSafe(args[1], action.reason)) {
+            if (args.Size() >= 2)
+            {
+                if (!rj::getSafe(args[1], action.reason))
+                {
                     return;
                 }
             }
 
             this->signals_.moderation.userBanned.invoke(action);
-        } catch (const std::runtime_error &ex) {
+        }
+        catch (const std::runtime_error &ex)
+        {
             log("Error parsing moderation action: {}", ex.what());
         }
     };
@@ -425,19 +467,24 @@ PubSub::PubSub()
 
         action.previousState = UnbanAction::Banned;
 
-        try {
+        try
+        {
             const auto &args = getArgs(data);
 
-            if (args.Size() < 1) {
+            if (args.Size() < 1)
+            {
                 return;
             }
 
-            if (!rj::getSafe(args[0], action.target.name)) {
+            if (!rj::getSafe(args[0], action.target.name))
+            {
                 return;
             }
 
             this->signals_.moderation.userUnbanned.invoke(action);
-        } catch (const std::runtime_error &ex) {
+        }
+        catch (const std::runtime_error &ex)
+        {
             log("Error parsing moderation action: {}", ex.what());
         }
     };
@@ -451,22 +498,217 @@ PubSub::PubSub()
 
         action.previousState = UnbanAction::TimedOut;
 
-        try {
+        try
+        {
             const auto &args = getArgs(data);
 
-            if (args.Size() < 1) {
+            if (args.Size() < 1)
+            {
                 return;
             }
 
-            if (!rj::getSafe(args[0], action.target.name)) {
+            if (!rj::getSafe(args[0], action.target.name))
+            {
                 return;
             }
 
             this->signals_.moderation.userUnbanned.invoke(action);
-        } catch (const std::runtime_error &ex) {
+        }
+        catch (const std::runtime_error &ex)
+        {
             log("Error parsing moderation action: {}", ex.what());
         }
     };
+
+    this->moderationActionHandlers["automod_rejected"] =
+        [this](const auto &data, const auto &roomID) {
+            // Display the automod message and prompt the allow/deny
+            AutomodAction action(data, roomID);
+
+            getCreatedByUser(data, action.source);
+            getTargetUser(data, action.target);
+
+            try
+            {
+                const auto &args = getArgs(data);
+                const auto &msgID = getMsgID(data);
+
+                if (args.Size() < 1)
+                {
+                    return;
+                }
+
+                if (!rj::getSafe(args[0], action.target.name))
+                {
+                    return;
+                }
+
+                if (args.Size() >= 2)
+                {
+                    if (!rj::getSafe(args[1], action.message))
+                    {
+                        return;
+                    }
+                }
+
+                if (args.Size() >= 3)
+                {
+                    if (!rj::getSafe(args[2], action.reason))
+                    {
+                        return;
+                    }
+                }
+
+                if (!rj::getSafe(msgID, action.msgID))
+                {
+                    return;
+                }
+
+                this->signals_.moderation.automodMessage.invoke(action);
+            }
+            catch (const std::runtime_error &ex)
+            {
+                log("Error parsing moderation action: {}", ex.what());
+            }
+        };
+
+    this->moderationActionHandlers["add_permitted_term"] =
+        [this](const auto &data, const auto &roomID) {
+            // This term got a pass through automod
+            AutomodUserAction action(data, roomID);
+            getCreatedByUser(data, action.source);
+
+            try
+            {
+                const auto &args = getArgs(data);
+                action.type = AutomodUserAction::AddPermitted;
+
+                if (args.Size() < 1)
+                {
+                    return;
+                }
+
+                if (!rj::getSafe(args[0], action.message))
+                {
+                    return;
+                }
+
+                this->signals_.moderation.automodUserMessage.invoke(action);
+            }
+            catch (const std::runtime_error &ex)
+            {
+                log("Error parsing moderation action: {}", ex.what());
+            }
+        };
+
+    this->moderationActionHandlers["add_blocked_term"] =
+        [this](const auto &data, const auto &roomID) {
+            // A term has been added
+            AutomodUserAction action(data, roomID);
+            getCreatedByUser(data, action.source);
+
+            try
+            {
+                const auto &args = getArgs(data);
+                action.type = AutomodUserAction::AddBlocked;
+
+                if (args.Size() < 1)
+                {
+                    return;
+                }
+
+                if (!rj::getSafe(args[0], action.message))
+                {
+                    return;
+                }
+
+                this->signals_.moderation.automodUserMessage.invoke(action);
+            }
+            catch (const std::runtime_error &ex)
+            {
+                log("Error parsing moderation action: {}", ex.what());
+            }
+        };
+
+    this->moderationActionHandlers["delete_permitted_term"] =
+        [this](const auto &data, const auto &roomID) {
+            // This term got deleted
+            AutomodUserAction action(data, roomID);
+            getCreatedByUser(data, action.source);
+
+            try
+            {
+                const auto &args = getArgs(data);
+                action.type = AutomodUserAction::RemovePermitted;
+
+                if (args.Size() < 1)
+                {
+                    return;
+                }
+
+                if (!rj::getSafe(args[0], action.message))
+                {
+                    return;
+                }
+
+                this->signals_.moderation.automodUserMessage.invoke(action);
+            }
+            catch (const std::runtime_error &ex)
+            {
+                log("Error parsing moderation action: {}", ex.what());
+            }
+        };
+
+    this->moderationActionHandlers["delete_blocked_term"] =
+        [this](const auto &data, const auto &roomID) {
+            // This term got deleted
+            AutomodUserAction action(data, roomID);
+
+            getCreatedByUser(data, action.source);
+
+            try
+            {
+                const auto &args = getArgs(data);
+                action.type = AutomodUserAction::RemoveBlocked;
+
+                if (args.Size() < 1)
+                {
+                    return;
+                }
+
+                if (!rj::getSafe(args[0], action.message))
+                {
+                    return;
+                }
+
+                this->signals_.moderation.automodUserMessage.invoke(action);
+            }
+            catch (const std::runtime_error &ex)
+            {
+                log("Error parsing moderation action: {}", ex.what());
+            }
+        };
+
+    this->moderationActionHandlers["modified_automod_properties"] =
+        [this](const auto &data, const auto &roomID) {
+            // The automod settings got modified
+            AutomodUserAction action(data, roomID);
+            getCreatedByUser(data, action.source);
+            action.type = AutomodUserAction::Properties;
+            this->signals_.moderation.automodUserMessage.invoke(action);
+        };
+
+    this->moderationActionHandlers["denied_automod_message"] =
+        [](const auto &data, const auto &roomID) {
+            // This message got denied by a moderator
+            // qDebug() << QString::fromStdString(rj::stringify(data));
+        };
+
+    this->moderationActionHandlers["approved_automod_message"] =
+        [](const auto &data, const auto &roomID) {
+            // This message got approved by a moderator
+            // qDebug() << QString::fromStdString(rj::stringify(data));
+        };
 
     this->websocketClient.set_access_channels(websocketpp::log::alevel::all);
     this->websocketClient.clear_access_channels(
@@ -494,7 +736,8 @@ void PubSub::addClient()
     websocketpp::lib::error_code ec;
     auto con = this->websocketClient.get_connection(TWITCH_PUBSUB_URL, ec);
 
-    if (ec) {
+    if (ec)
+    {
         log("Unable to establish connection: {}", ec.message());
         return;
     }
@@ -521,7 +764,8 @@ void PubSub::listenToWhispers(std::shared_ptr<TwitchAccount> account)
 
     this->listen(createListenMessage(topics, account));
 
-    if (ec) {
+    if (ec)
+    {
         log("Unable to send message to websocket server: {}", ec.message());
         return;
     }
@@ -529,7 +773,8 @@ void PubSub::listenToWhispers(std::shared_ptr<TwitchAccount> account)
 
 void PubSub::unlistenAllModerationActions()
 {
-    for (const auto &p : this->clients) {
+    for (const auto &p : this->clients)
+    {
         const auto &client = p.second;
         client->unlistenPrefix("chat_moderator_actions.");
     }
@@ -541,11 +786,13 @@ void PubSub::listenToChannelModerationActions(
     assert(!channelID.isEmpty());
     assert(account != nullptr);
     QString userID = account->getUserId();
-    if (userID.isEmpty()) return;
+    if (userID.isEmpty())
+        return;
 
     std::string topic(fS("chat_moderator_actions.{}.{}", userID, channelID));
 
-    if (this->isListeningToTopic(topic)) {
+    if (this->isListeningToTopic(topic))
+    {
         log("We are already listening to topic {}", topic);
         return;
     }
@@ -565,10 +812,13 @@ void PubSub::listenToTopic(const std::string &topic,
 
 void PubSub::listen(rapidjson::Document &&msg)
 {
-    if (this->tryListen(msg)) {
+    if (this->tryListen(msg))
+    {
         log("Successfully listened!");
         return;
     }
+
+    this->addClient();
 
     log("Added to the back of the queue");
     this->requests.emplace_back(
@@ -578,9 +828,11 @@ void PubSub::listen(rapidjson::Document &&msg)
 bool PubSub::tryListen(rapidjson::Document &msg)
 {
     log("tryListen with {} clients", this->clients.size());
-    for (const auto &p : this->clients) {
+    for (const auto &p : this->clients)
+    {
         const auto &client = p.second;
-        if (client->listen(msg)) {
+        if (client->listen(msg))
+        {
             return true;
         }
     }
@@ -590,9 +842,11 @@ bool PubSub::tryListen(rapidjson::Document &msg)
 
 bool PubSub::isListeningToTopic(const std::string &topic)
 {
-    for (const auto &p : this->clients) {
+    for (const auto &p : this->clients)
+    {
         const auto &client = p.second;
-        if (client->isListeningToTopic(topic)) {
+        if (client->isListeningToTopic(topic))
+        {
             return true;
         }
     }
@@ -609,13 +863,15 @@ void PubSub::onMessage(websocketpp::connection_hdl hdl,
 
     rapidjson::ParseResult res = msg.Parse(payload.c_str());
 
-    if (!res) {
+    if (!res)
+    {
         log("Error parsing message '{}' from PubSub: {}", payload,
             rapidjson::GetParseError_En(res.Code()));
         return;
     }
 
-    if (!msg.IsObject()) {
+    if (!msg.IsObject())
+    {
         log("Error parsing message '{}' from PubSub. Root object is not an "
             "object",
             payload);
@@ -624,28 +880,36 @@ void PubSub::onMessage(websocketpp::connection_hdl hdl,
 
     std::string type;
 
-    if (!rj::getSafe(msg, "type", type)) {
+    if (!rj::getSafe(msg, "type", type))
+    {
         log("Missing required string member `type` in message root");
         return;
     }
 
-    if (type == "RESPONSE") {
+    if (type == "RESPONSE")
+    {
         this->handleListenResponse(msg);
-    } else if (type == "MESSAGE") {
-        if (!msg.HasMember("data")) {
+    }
+    else if (type == "MESSAGE")
+    {
+        if (!msg.HasMember("data"))
+        {
             log("Missing required object member `data` in message root");
             return;
         }
 
         const auto &data = msg["data"];
 
-        if (!data.IsObject()) {
+        if (!data.IsObject())
+        {
             log("Member `data` must be an object");
             return;
         }
 
         this->handleMessageResponse(data);
-    } else if (type == "PONG") {
+    }
+    else if (type == "PONG")
+    {
         auto clientIt = this->clients.find(hdl);
 
         // If this assert goes off, there's something wrong with the connection
@@ -655,7 +919,9 @@ void PubSub::onMessage(websocketpp::connection_hdl hdl,
         auto &client = *clientIt;
 
         client.second->handlePong();
-    } else {
+    }
+    else
+    {
         log("Unknown message type: {}", type);
     }
 }
@@ -672,6 +938,19 @@ void PubSub::onConnectionOpen(WebsocketHandle hdl)
     this->clients.emplace(hdl, client);
 
     this->connected.invoke();
+
+    for (auto it = this->requests.begin(); it != this->requests.end();)
+    {
+        const auto &request = *it;
+        if (client->listen(*request))
+        {
+            it = this->requests.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }
 
 void PubSub::onConnectionClose(WebsocketHandle hdl)
@@ -696,11 +975,14 @@ PubSub::WebsocketContextPtr PubSub::onTLSInit(websocketpp::connection_hdl hdl)
     WebsocketContextPtr ctx(
         new boost::asio::ssl::context(boost::asio::ssl::context::tlsv1));
 
-    try {
+    try
+    {
         ctx->set_options(boost::asio::ssl::context::default_workarounds |
                          boost::asio::ssl::context::no_sslv2 |
                          boost::asio::ssl::context::single_dh_use);
-    } catch (const std::exception &e) {
+    }
+    catch (const std::exception &e)
+    {
         log("Exception caught in OnTLSInit: {}", e.what());
     }
 
@@ -711,11 +993,13 @@ void PubSub::handleListenResponse(const rapidjson::Document &msg)
 {
     std::string error;
 
-    if (rj::getSafe(msg, "error", error)) {
+    if (rj::getSafe(msg, "error", error))
+    {
         std::string nonce;
         rj::getSafe(msg, "nonce", nonce);
 
-        if (error.empty()) {
+        if (error.empty())
+        {
             log("Successfully listened to nonce {}", nonce);
             // Nothing went wrong
             return;
@@ -730,14 +1014,16 @@ void PubSub::handleMessageResponse(const rapidjson::Value &outerData)
 {
     QString topic;
 
-    if (!rj::getSafe(outerData, "topic", topic)) {
+    if (!rj::getSafe(outerData, "topic", topic))
+    {
         log("Missing required string member `topic` in outerData");
         return;
     }
 
     std::string payload;
 
-    if (!rj::getSafe(outerData, "message", payload)) {
+    if (!rj::getSafe(outerData, "message", payload))
+    {
         log("Expected string message in outerData");
         return;
     }
@@ -746,53 +1032,69 @@ void PubSub::handleMessageResponse(const rapidjson::Value &outerData)
 
     rapidjson::ParseResult res = msg.Parse(payload.c_str());
 
-    if (!res) {
+    if (!res)
+    {
         log("Error parsing message '{}' from PubSub: {}", payload,
             rapidjson::GetParseError_En(res.Code()));
         return;
     }
 
-    if (topic.startsWith("whispers.")) {
+    if (topic.startsWith("whispers."))
+    {
         std::string whisperType;
 
-        if (!rj::getSafe(msg, "type", whisperType)) {
+        if (!rj::getSafe(msg, "type", whisperType))
+        {
             log("Bad whisper data");
             return;
         }
 
-        if (whisperType == "whisper_received") {
+        if (whisperType == "whisper_received")
+        {
             this->signals_.whisper.received.invoke(msg);
-        } else if (whisperType == "whisper_sent") {
+        }
+        else if (whisperType == "whisper_sent")
+        {
             this->signals_.whisper.sent.invoke(msg);
-        } else if (whisperType == "thread") {
+        }
+        else if (whisperType == "thread")
+        {
             // Handle thread?
-        } else {
+        }
+        else
+        {
             log("Invalid whisper type: {}", whisperType);
             assert(false);
             return;
         }
-    } else if (topic.startsWith("chat_moderator_actions.")) {
+    }
+    else if (topic.startsWith("chat_moderator_actions."))
+    {
         auto topicParts = topic.split(".");
         assert(topicParts.length() == 3);
         const auto &data = msg["data"];
 
         std::string moderationAction;
 
-        if (!rj::getSafe(data, "moderation_action", moderationAction)) {
+        if (!rj::getSafe(data, "moderation_action", moderationAction))
+        {
             log("Missing moderation action in data: {}", rj::stringify(data));
             return;
         }
 
         auto handlerIt = this->moderationActionHandlers.find(moderationAction);
 
-        if (handlerIt == this->moderationActionHandlers.end()) {
+        if (handlerIt == this->moderationActionHandlers.end())
+        {
             log("No handler found for moderation action {}", moderationAction);
             return;
         }
 
         // Invoke handler function
         handlerIt->second(data, topicParts[2]);
-    } else {
+    }
+    else
+    {
         log("Unknown topic: {}", topic);
         return;
     }

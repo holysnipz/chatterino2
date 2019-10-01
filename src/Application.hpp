@@ -1,14 +1,14 @@
 #pragma once
 
-#include "common/Singleton.hpp"
-#include "singletons/NativeMessaging.hpp"
-
 #include <QApplication>
 #include <memory>
 
+#include "common/Singleton.hpp"
+#include "singletons/NativeMessaging.hpp"
+
 namespace chatterino {
 
-class TwitchServer;
+class TwitchIrcServer;
 class PubSub;
 
 class CommandController;
@@ -18,6 +18,7 @@ class TaggedUsersController;
 class AccountController;
 class ModerationActions;
 class NotificationController;
+class PingController;
 
 class Theme;
 class WindowManager;
@@ -27,7 +28,6 @@ class AccountManager;
 class Emotes;
 class Settings;
 class Fonts;
-class Resources2;
 class Toasts;
 class ChatterinoBadges;
 
@@ -50,8 +50,6 @@ public:
 
     friend void test();
 
-    Resources2 *const resources;
-
     Theme *const themes{};
     Fonts *const fonts{};
     Emotes *const emotes{};
@@ -62,17 +60,18 @@ public:
     CommandController *const commands{};
     HighlightController *const highlights{};
     NotificationController *const notifications{};
+    PingController *const pings{};
     IgnoreController *const ignores{};
     TaggedUsersController *const taggedUsers{};
     ModerationActions *const moderationActions{};
-    TwitchServer *const twitch2{};
+    TwitchIrcServer *const twitch2{};
     ChatterinoBadges *const chatterinoBadges{};
 
     /*[[deprecated]]*/ Logging *const logging{};
 
     /// Provider-specific
     struct {
-        /*[[deprecated("use twitch2 instead")]]*/ TwitchServer *server{};
+        /*[[deprecated("use twitch2 instead")]]*/ TwitchIrcServer *server{};
         /*[[deprecated("use twitch2->pubsub instead")]]*/ PubSub *pubsub{};
     } twitch;
 

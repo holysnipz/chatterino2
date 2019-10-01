@@ -14,24 +14,29 @@ AccountController::AccountController()
     });
 
     this->twitch.accounts.itemRemoved.connect([this](const auto &args) {
-        if (args.caller != this) {
+        if (args.caller != this)
+        {
             auto &accs = this->twitch.accounts.getVector();
             auto it = std::find(accs.begin(), accs.end(), args.item);
             assert(it != accs.end());
 
-            this->accounts_.removeItem(it - accs.begin());
+            this->accounts_.removeItem(it - accs.begin(), this);
         }
     });
 
     this->accounts_.itemRemoved.connect([this](const auto &args) {
-        switch (args.item->getProviderId()) {
+        switch (args.item->getProviderId())
+        {
             case ProviderId::Twitch: {
-                auto &accs = this->twitch.accounts.getVector();
-                auto it = std::find(accs.begin(), accs.end(), args.item);
-                assert(it != accs.end());
-
-                this->twitch.accounts.removeItem(it - accs.begin(), this);
-            } break;
+                if (args.caller != this)
+                {
+                    auto accs = this->twitch.accounts.cloneVector();
+                    auto it = std::find(accs.begin(), accs.end(), args.item);
+                    assert(it != accs.end());
+                    this->twitch.accounts.removeItem(it - accs.begin(), this);
+                }
+            }
+            break;
         }
     });
 }

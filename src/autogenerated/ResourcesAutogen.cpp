@@ -10,6 +10,9 @@ Resources2::Resources2()
     this->buttons.addSplitDark = QPixmap(":/buttons/addSplitDark.png");
     this->buttons.ban = QPixmap(":/buttons/ban.png");
     this->buttons.banRed = QPixmap(":/buttons/banRed.png");
+    this->buttons.copyDark = QPixmap(":/buttons/copyDark.png");
+    this->buttons.copyDarkTheme = QPixmap(":/buttons/copyDarkTheme.png");
+    this->buttons.copyLight = QPixmap(":/buttons/copyLight.png");
     this->buttons.menuDark = QPixmap(":/buttons/menuDark.png");
     this->buttons.menuLight = QPixmap(":/buttons/menuLight.png");
     this->buttons.mod = QPixmap(":/buttons/mod.png");
@@ -17,7 +20,9 @@ Resources2::Resources2()
     this->buttons.modModeDisabled2 = QPixmap(":/buttons/modModeDisabled2.png");
     this->buttons.modModeEnabled = QPixmap(":/buttons/modModeEnabled.png");
     this->buttons.modModeEnabled2 = QPixmap(":/buttons/modModeEnabled2.png");
+    this->buttons.search = QPixmap(":/buttons/search.png");
     this->buttons.timeout = QPixmap(":/buttons/timeout.png");
+    this->buttons.trashCan = QPixmap(":/buttons/trashCan.png");
     this->buttons.unban = QPixmap(":/buttons/unban.png");
     this->buttons.unmod = QPixmap(":/buttons/unmod.png");
     this->buttons.update = QPixmap(":/buttons/update.png");
@@ -32,6 +37,7 @@ Resources2::Resources2()
     this->split.right = QPixmap(":/split/right.png");
     this->split.up = QPixmap(":/split/up.png");
     this->twitch.admin = QPixmap(":/twitch/admin.png");
+    this->twitch.automod = QPixmap(":/twitch/automod.png");
     this->twitch.broadcaster = QPixmap(":/twitch/broadcaster.png");
     this->twitch.cheer1 = QPixmap(":/twitch/cheer1.png");
     this->twitch.globalmod = QPixmap(":/twitch/globalmod.png");
@@ -41,6 +47,7 @@ Resources2::Resources2()
     this->twitch.subscriber = QPixmap(":/twitch/subscriber.png");
     this->twitch.turbo = QPixmap(":/twitch/turbo.png");
     this->twitch.verified = QPixmap(":/twitch/verified.png");
+    this->twitch.vip = QPixmap(":/twitch/vip.png");
 }
 
 }  // namespace chatterino

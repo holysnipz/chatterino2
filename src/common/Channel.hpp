@@ -15,8 +15,16 @@ namespace chatterino {
 
 struct Message;
 using MessagePtr = std::shared_ptr<const Message>;
-enum class MessageFlag : uint16_t;
+enum class MessageFlag : uint32_t;
 using MessageFlags = FlagsEnum<MessageFlag>;
+
+enum class TimeoutStackStyle : int {
+    StackHard = 0,
+    DontStackBeyondUserMessage = 1,
+    DontStack = 2,
+
+    Default = DontStackBeyondUserMessage,
+};
 
 class Channel : public std::enable_shared_from_this<Channel>
 {
@@ -29,15 +37,16 @@ public:
         TwitchWatching,
         TwitchMentions,
         TwitchEnd,
+        Irc,
         Misc
     };
 
     explicit Channel(const QString &name, Type type);
     virtual ~Channel();
 
+    // SIGNALS
     pajlada::Signals::Signal<const QString &, const QString &, bool &>
         sendMessageSignal;
-
     pajlada::Signals::Signal<MessagePtr &> messageRemovedFromStart;
     pajlada::Signals::Signal<MessagePtr &, boost::optional<MessageFlags>>
         messageAppended;
@@ -47,10 +56,12 @@ public:
 
     Type getType() const;
     const QString &getName() const;
+    virtual const QString &getDisplayName() const;
     bool isTwitchChannel() const;
     virtual bool isEmpty() const;
     LimitedQueueSnapshot<MessagePtr> getMessageSnapshot();
 
+    // MESSAGES
     // overridingFlags can be filled in with flags that should be used instead
     // of the message's flags. This is useful in case a flag is specific to a
     // type of split
@@ -61,15 +72,22 @@ public:
     void addOrReplaceTimeout(MessagePtr message);
     void disableAllMessages();
     void replaceMessage(MessagePtr message, MessagePtr replacement);
+    void deleteMessage(QString messageID);
+    void clearMessages();
 
     QStringList modList;
 
+    // CHANNEL INFO
     virtual bool canSendMessage() const;
     virtual void sendMessage(const QString &message);
     virtual bool isMod() const;
     virtual bool isBroadcaster() const;
     virtual bool hasModRights() const;
+    virtual bool hasHighRateLimit() const;
     virtual bool isLive() const;
+    virtual bool shouldIgnoreHighlights() const;
+    virtual bool canReconnect() const;
+    virtual void reconnect();
 
     static std::shared_ptr<Channel> getEmpty();
 
@@ -77,7 +95,6 @@ public:
 
 protected:
     virtual void onConnected();
-    virtual void addRecentChatter(const MessagePtr &message);
 
 private:
     const QString name_;

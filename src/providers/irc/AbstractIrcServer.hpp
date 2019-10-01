@@ -1,21 +1,24 @@
 #pragma once
 
-#include "providers/irc/IrcConnection2.hpp"
-
 #include <IrcMessage>
-#include <pajlada/signals/signal.hpp>
-
 #include <functional>
 #include <mutex>
+#include <pajlada/signals/signal.hpp>
+#include <pajlada/signals/signalholder.hpp>
+
+#include "common/Common.hpp"
+#include "providers/irc/IrcConnection2.hpp"
 
 namespace chatterino {
 
 class Channel;
 using ChannelPtr = std::shared_ptr<Channel>;
 
-class AbstractIrcServer
+class AbstractIrcServer : public QObject
 {
 public:
+    enum ConnectionType { Read = 1, Write = 2, Both = 3 };
+
     virtual ~AbstractIrcServer() = default;
 
     // connection
@@ -26,14 +29,13 @@ public:
     void sendRawMessage(const QString &rawMessage);
 
     // channels
-    std::shared_ptr<Channel> getOrAddChannel(const QString &dirtyChannelName);
-    std::shared_ptr<Channel> getChannelOrEmpty(const QString &dirtyChannelName);
+    ChannelPtr getOrAddChannel(const QString &dirtyChannelName);
+    ChannelPtr getChannelOrEmpty(const QString &dirtyChannelName);
+    std::vector<std::weak_ptr<Channel>> getChannels();
 
     // signals
     pajlada::Signals::NoArgSignal connected;
     pajlada::Signals::NoArgSignal disconnected;
-    //    pajlada::Signals::Signal<Communi::IrcPrivateMessage *>
-    //    onPrivateMessage;
 
     void addFakeMessage(const QString &data);
 
@@ -43,16 +45,17 @@ public:
 protected:
     AbstractIrcServer();
 
-    virtual void initializeConnection(IrcConnection *connection, bool isRead,
-                                      bool isWrite) = 0;
+    virtual void initializeConnection(IrcConnection *connection,
+                                      ConnectionType type) = 0;
     virtual std::shared_ptr<Channel> createChannel(
         const QString &channelName) = 0;
 
     virtual void privateMessageReceived(Communi::IrcPrivateMessage *message);
-    virtual void messageReceived(Communi::IrcMessage *message);
+    virtual void readConnectionMessageReceived(Communi::IrcMessage *message);
     virtual void writeConnectionMessageReceived(Communi::IrcMessage *message);
 
-    virtual void onConnected();
+    virtual void onReadConnected(IrcConnection *connection);
+    virtual void onWriteConnected(IrcConnection *connection);
     virtual void onDisconnected();
     virtual void onSocketError();
 
@@ -62,14 +65,16 @@ protected:
     virtual bool hasSeparateWriteConnection() const = 0;
     virtual QString cleanChannelName(const QString &dirtyChannelName);
 
+    void open(ConnectionType type);
+
     QMap<QString, std::weak_ptr<Channel>> channels;
     std::mutex channelMutex;
 
 private:
     void initConnection();
 
-    std::unique_ptr<IrcConnection> writeConnection_ = nullptr;
-    std::unique_ptr<IrcConnection> readConnection_ = nullptr;
+    QObjectPtr<IrcConnection> writeConnection_ = nullptr;
+    QObjectPtr<IrcConnection> readConnection_ = nullptr;
 
     QTimer reconnectTimer_;
     int falloffCounter_ = 1;
@@ -77,6 +82,7 @@ private:
     std::mutex connectionMutex_;
 
     //    bool autoReconnect_ = false;
+    pajlada::Signals::SignalHolder connections_;
 };
 
 }  // namespace chatterino

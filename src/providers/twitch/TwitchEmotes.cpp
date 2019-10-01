@@ -13,12 +13,39 @@ TwitchEmotes::TwitchEmotes()
 {
 }
 
+QString TwitchEmotes::cleanUpEmoteCode(const EmoteName &dirtyEmoteCode)
+{
+    auto cleanCode = dirtyEmoteCode.string;
+    cleanCode.detach();
+
+    static QMap<QString, QString> emoteNameReplacements{
+        {"[oO](_|\\.)[oO]", "O_o"}, {"\\&gt\\;\\(", "&gt;("},
+        {"\\&lt\\;3", "&lt;3"},     {"\\:-?(o|O)", ":O"},
+        {"\\:-?(p|P)", ":P"},       {"\\:-?[\\\\/]", ":/"},
+        {"\\:-?[z|Z|\\|]", ":Z"},   {"\\:-?\\(", ":("},
+        {"\\:-?\\)", ":)"},         {"\\:-?D", ":D"},
+        {"\\;-?(p|P)", ";P"},       {"\\;-?\\)", ";)"},
+        {"R-?\\)", "R)"},           {"B-?\\)", "B)"},
+    };
+
+    auto it = emoteNameReplacements.find(dirtyEmoteCode.string);
+    if (it != emoteNameReplacements.end())
+    {
+        cleanCode = it.value();
+    }
+
+    cleanCode.replace("&lt;", "<");
+    cleanCode.replace("&gt;", ">");
+
+    return cleanCode;
+}
+
 // id is used for lookup
 // emoteName is used for giving a name to the emote in case it doesn't exist
 EmotePtr TwitchEmotes::getOrCreateEmote(const EmoteId &id,
                                         const EmoteName &name_)
 {
-    static QMap<QString, QString> replacements{
+    static const QMap<QString, QString> replacements{
         {"[oO](_|\\.)[oO]", "O_o"}, {"\\&gt\\;\\(", "&gt;("},
         {"\\&lt\\;3", "&lt;3"},     {"\\:-?(o|O)", ":O"},
         {"\\:-?(p|P)", ":P"},       {"\\:-?[\\\\/]", ":/"},
@@ -37,7 +64,8 @@ EmotePtr TwitchEmotes::getOrCreateEmote(const EmoteId &id,
 
     // replace regexes
     auto it = replacements.find(name);
-    if (it != replacements.end()) {
+    if (it != replacements.end())
+    {
         name = it.value();
     }
 
@@ -45,7 +73,8 @@ EmotePtr TwitchEmotes::getOrCreateEmote(const EmoteId &id,
     auto cache = this->twitchEmotesCache_.access();
     auto shared = (*cache)[id].lock();
 
-    if (!shared) {
+    if (!shared)
+    {
         (*cache)[id] = shared = std::make_shared<Emote>(
             Emote{EmoteName{name},
                   ImageSet{
@@ -64,11 +93,6 @@ Url TwitchEmotes::getEmoteLink(const EmoteId &id, const QString &emoteScale)
     return {QString(TWITCH_EMOTE_TEMPLATE)
                 .replace("{id}", id.string)
                 .replace("{scale}", emoteScale)};
-}
-
-AccessGuard<std::unordered_map<EmoteName, EmotePtr>> TwitchEmotes::accessAll()
-{
-    return this->twitchEmotes_.access();
 }
 
 }  // namespace chatterino

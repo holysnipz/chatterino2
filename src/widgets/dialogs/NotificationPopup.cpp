@@ -11,7 +11,7 @@
 namespace chatterino {
 
 NotificationPopup::NotificationPopup()
-    : BaseWindow((QWidget *)nullptr, BaseWindow::Frameless)
+    : BaseWindow(BaseWindow::Frameless)
     , channel_(std::make_shared<Channel>("notifications", Channel::Type::None))
 
 {
@@ -33,11 +33,13 @@ void NotificationPopup::updatePosition()
     QDesktopWidget *desktop = QApplication::desktop();
     const QRect rect = desktop->availableGeometry();
 
-    switch (location) {
+    switch (location)
+    {
         case BottomRight: {
             this->move(rect.right() - this->width(),
                        rect.bottom() - this->height());
-        } break;
+        }
+        break;
     }
 }
 

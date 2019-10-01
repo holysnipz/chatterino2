@@ -18,6 +18,28 @@
 
 namespace chatterino {
 
+#ifdef USEWINSDK
+static thread_local std::vector<HWND> taskbarHwnds;
+
+BOOL CALLBACK enumWindows(HWND hwnd, LPARAM)
+{
+    constexpr int length = 16;
+
+    auto className = std::make_unique<WCHAR[]>(length);
+    GetClassName(hwnd, className.get(), length);
+
+    // qDebug() << QString::fromWCharArray(className.get(), length);
+
+    if (lstrcmp(className.get(), L"Shell_TrayWnd") == 0 ||
+        lstrcmp(className.get(), L"Shell_Secondary") == 0)
+    {
+        taskbarHwnds.push_back(hwnd);
+    }
+
+    return true;
+}
+#endif
+
 AttachedWindow::AttachedWindow(void *_target, int _yOffset)
     : QWidget(nullptr, Qt::FramelessWindowHint | Qt::Window)
     , target_(_target)
@@ -37,8 +59,10 @@ AttachedWindow::AttachedWindow(void *_target, int _yOffset)
 
 AttachedWindow::~AttachedWindow()
 {
-    for (auto it = items.begin(); it != items.end(); it++) {
-        if (it->window == this) {
+    for (auto it = items.begin(); it != items.end(); it++)
+    {
+        if (it->window == this)
+        {
             items.erase(it);
             break;
         }
@@ -50,8 +74,10 @@ AttachedWindow::~AttachedWindow()
 AttachedWindow *AttachedWindow::get(void *target, const GetArgs &args)
 {
     AttachedWindow *window = [&]() {
-        for (Item &item : items) {
-            if (item.hwnd == target) {
+        for (Item &item : items)
+        {
+            if (item.hwnd == target)
+            {
                 return item.window;
             }
         }
@@ -64,26 +90,37 @@ AttachedWindow *AttachedWindow::get(void *target, const GetArgs &args)
     bool show = true;
     QSize size = window->size();
 
-    if (args.height != -1) {
-        if (args.height == 0) {
+    window->fullscreen_ = args.fullscreen;
+
+    if (args.height != -1)
+    {
+        if (args.height == 0)
+        {
             window->hide();
             show = false;
-        } else {
+        }
+        else
+        {
             window->height_ = args.height;
             size.setHeight(args.height);
         }
     }
-    if (args.width != -1) {
-        if (args.width == 0) {
+    if (args.width != -1)
+    {
+        if (args.width == 0)
+        {
             window->hide();
             show = false;
-        } else {
+        }
+        else
+        {
             window->width_ = args.width;
             size.setWidth(args.width);
         }
     }
 
-    if (show) {
+    if (show)
+    {
         window->updateWindowRect(window->target_);
         window->show();
     }
@@ -93,8 +130,10 @@ AttachedWindow *AttachedWindow::get(void *target, const GetArgs &args)
 
 void AttachedWindow::detach(const QString &winId)
 {
-    for (Item &item : items) {
-        if (item.winId == winId) {
+    for (Item &item : items)
+    {
+        if (item.winId == winId)
+        {
             item.window->deleteLater();
         }
     }
@@ -113,19 +152,22 @@ void AttachedWindow::showEvent(QShowEvent *)
 void AttachedWindow::attachToHwnd(void *_attachedPtr)
 {
 #ifdef USEWINSDK
-    if (this->attached_) {
+    if (this->attached_)
+    {
         return;
     }
 
     this->attached_ = true;
-    this->timer_.setInterval(1);
 
-    auto hwnd = HWND(this->winId());
+    //auto hwnd = HWND(this->winId());
     auto attached = HWND(_attachedPtr);
 
-    QObject::connect(&this->timer_, &QTimer::timeout, [this, hwnd, attached] {
+    // FAST TIMER - used to resize/reorder windows
+    this->timer_.setInterval(1);
+    QObject::connect(&this->timer_, &QTimer::timeout, [this, attached] {
         // check process id
-        if (!this->validProcessName_) {
+        if (!this->validProcessName_)
+        {
             DWORD processId;
             ::GetWindowThreadProcessId(attached, &processId);
 
@@ -136,10 +178,11 @@ void AttachedWindow::attachToHwnd(void *_attachedPtr)
             DWORD filenameLength =
                 ::GetModuleFileNameEx(process, nullptr, filename.get(), 512);
             QString qfilename =
-                QString::fromWCharArray(filename.get(), filenameLength);
+                QString::fromWCharArray(filename.get(), int(filenameLength));
 
             if (!qfilename.endsWith("chrome.exe") &&
-                !qfilename.endsWith("firefox.exe")) {
+                !qfilename.endsWith("firefox.exe"))
+            {
                 qDebug() << "NM Illegal caller" << qfilename;
                 this->timer_.stop();
                 this->deleteLater();
@@ -150,7 +193,26 @@ void AttachedWindow::attachToHwnd(void *_attachedPtr)
 
         this->updateWindowRect(attached);
     });
+
     this->timer_.start();
+
+    // SLOW TIMER - used to hide taskbar behind fullscreen window
+    this->slowTimer_.setInterval(2000);
+    QObject::connect(&this->slowTimer_, &QTimer::timeout, [this, attached] {
+        if (this->fullscreen_)
+        {
+            taskbarHwnds.clear();
+            ::EnumWindows(&enumWindows, 0);
+
+            for (auto taskbarHwnd : taskbarHwnds)
+            {
+                ::SetWindowPos(taskbarHwnd,
+                               GetNextWindow(attached, GW_HWNDNEXT), 0, 0, 0, 0,
+                               SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
+        }
+    });
+    this->slowTimer_.start();
 #endif
 }
 
@@ -167,7 +229,8 @@ void AttachedWindow::updateWindowRect(void *_attachedPtr)
     RECT rect;
     ::GetWindowRect(attached, &rect);
 
-    if (::GetLastError() != 0) {
+    if (::GetLastError() != 0)
+    {
         qDebug() << "NM GetLastError()" << ::GetLastError();
 
         this->timer_.stop();
@@ -176,33 +239,41 @@ void AttachedWindow::updateWindowRect(void *_attachedPtr)
     }
 
     // set the correct z-order
-    HWND next = ::GetNextWindow(attached, GW_HWNDPREV);
-
-    ::SetWindowPos(hwnd, next ? next : HWND_TOPMOST, 0, 0, 0, 0,
-                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    if (HWND next = ::GetNextWindow(attached, GW_HWNDPREV))
+    {
+        ::SetWindowPos(hwnd, next ? next : HWND_TOPMOST, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
 
     float scale = 1.f;
-    if (auto dpi = getWindowDpi(attached)) {
+    if (auto dpi = getWindowDpi(attached))
+    {
         scale = dpi.get() / 96.f;
 
-        //        for (auto w : this->ui_.split->findChildren<BaseWidget *>()) {
-        //            w->setOverrideScale(scale);
-        //        }
-        //        this->ui_.split->setOverrideScale(scale);
+        for (auto w : this->ui_.split->findChildren<BaseWidget *>())
+        {
+            w->setOverrideScale(scale);
+        }
+        this->ui_.split->setOverrideScale(scale);
     }
 
-    if (this->height_ == -1) {
-        // ::MoveWindow(hwnd, rect.right - this->width_ - 8, rect.top +
-        // this->yOffset_ - 8,
-        //              this->width_, rect.bottom - rect.top - this->yOffset_,
-        //              false);
-    } else {
-        ::MoveWindow(hwnd,                                          //
-                     int(rect.right - this->width_ * scale - 8),    //
-                     int(rect.bottom - this->height_ * scale - 8),  //
-                     int(this->width_ * scale), int(this->height_ * scale),
-                     true);
+    if (this->height_ != -1)
+    {
+        this->ui_.split->setFixedWidth(int(this->width_ * scale));
+
+        // offset
+        int o = this->fullscreen_ ? 0 : 8;
+
+        ::MoveWindow(hwnd, int(rect.right - this->width_ * scale - o),
+                     int(rect.bottom - this->height_ * scale - o) + 4,
+                     int(this->width_ * scale) - 5,
+                     int(this->height_ * scale) - 5, true);
     }
+
+//    if (this->fullscreen_)
+//    {
+//        ::BringWindowToTop(attached);
+//    }
 
 //        ::MoveWindow(hwnd, rect.right - 360, rect.top + 82, 360 - 8,
 //        rect.bottom - rect.top - 82 - 8, false);

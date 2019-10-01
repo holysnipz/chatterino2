@@ -6,3 +6,42 @@ QCheckBox::indicator {
     width: <checkbox-size>px;
     height: <checkbox-size>px;
 }
+
+chatterino--ComboBox {
+    width: 120px;
+}
+
+QScrollArea {
+    border: none;
+}
+
+QScrollArea QFrame {
+    background: #222;
+    border: none;
+}
+
+QComboBox QFrame {
+    background: #000;
+    border: 1px solid #66BCFF;
+}
+
+chatterino--SettingsPage {
+    background: #222;
+    /*border: 1px solid #555;
+    border-left: none;*/
+}
+
+chatterino--PageHeader {
+    margin-bottom: 12px;
+}
+
+chatterino--TitleLabel {
+    font-family: "Segoe UI light";
+    font-size: 24px;
+    color: #4FC3F7;
+    margin-top: 16px;
+}
+
+chatterino--DescriptionLabel {
+    color: #999;
+}

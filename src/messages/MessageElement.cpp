@@ -73,6 +73,23 @@ MessageElement *MessageElement::updateLink()
     return this;
 }
 
+// Empty
+EmptyElement::EmptyElement()
+    : MessageElement(MessageElementFlag::None)
+{
+}
+
+void EmptyElement::addToContainer(MessageLayoutContainer &container,
+                                  MessageElementFlags flags)
+{
+}
+
+EmptyElement &EmptyElement::instance()
+{
+    static EmptyElement instance;
+    return instance;
+}
+
 // IMAGE
 ImageElement::ImageElement(ImagePtr image, MessageElementFlags flags)
     : MessageElement(flags)
@@ -84,7 +101,8 @@ ImageElement::ImageElement(ImagePtr image, MessageElementFlags flags)
 void ImageElement::addToContainer(MessageLayoutContainer &container,
                                   MessageElementFlags flags)
 {
-    if (flags.hasAny(this->getFlags())) {
+    if (flags.hasAny(this->getFlags()))
+    {
         auto size = QSize(this->image_->width() * container.getScale(),
                           this->image_->height() * container.getScale());
 
@@ -112,23 +130,85 @@ EmotePtr EmoteElement::getEmote() const
 void EmoteElement::addToContainer(MessageLayoutContainer &container,
                                   MessageElementFlags flags)
 {
-    if (flags.hasAny(this->getFlags())) {
-        if (flags.has(MessageElementFlag::EmoteImages)) {
-            auto image = this->emote_->images.getImage(container.getScale());
-            if (image->isEmpty()) return;
+    if (flags.hasAny(this->getFlags()))
+    {
+        if (flags.has(MessageElementFlag::EmoteImages))
+        {
+            auto image =
+                this->emote_->images.getImageOrLoaded(container.getScale());
+            if (image->isEmpty())
+                return;
 
-            auto size = QSize(int(container.getScale() * image->width()),
-                              int(container.getScale() * image->height()));
+            auto emoteScale = getSettings()->emoteScale.getValue();
 
-            container.addElement((new ImageLayoutElement(*this, image, size))
+            auto size =
+                QSize(int(container.getScale() * image->width() * emoteScale),
+                      int(container.getScale() * image->height() * emoteScale));
+
+            container.addElement(this->makeImageLayoutElement(image, size)
                                      ->setLink(this->getLink()));
-        } else {
-            if (this->textElement_) {
+        }
+        else
+        {
+            if (this->textElement_)
+            {
                 this->textElement_->addToContainer(container,
                                                    MessageElementFlag::Misc);
             }
         }
     }
+}
+
+MessageLayoutElement *EmoteElement::makeImageLayoutElement(
+    const ImagePtr &image, const QSize &size)
+{
+    return new ImageLayoutElement(*this, image, size);
+}
+
+// MOD BADGE
+ModBadgeElement::ModBadgeElement(const EmotePtr &data,
+                                 MessageElementFlags flags_)
+    : EmoteElement(data, flags_)
+{
+}
+
+MessageLayoutElement *ModBadgeElement::makeImageLayoutElement(
+    const ImagePtr &image, const QSize &size)
+{
+    static const QColor modBadgeBackgroundColor("#34AE0A");
+    return new ImageWithBackgroundLayoutElement(*this, image, size,
+                                                modBadgeBackgroundColor);
+}
+
+// BADGE
+BadgeElement::BadgeElement(const EmotePtr &emote, MessageElementFlags flags)
+    : MessageElement(flags)
+    , emote_(emote)
+{
+    this->setTooltip(emote->tooltip.string);
+}
+
+void BadgeElement::addToContainer(MessageLayoutContainer &container,
+                                  MessageElementFlags flags)
+{
+    if (flags.hasAny(this->getFlags()))
+    {
+        auto image =
+            this->emote_->images.getImageOrLoaded(container.getScale());
+        if (image->isEmpty())
+            return;
+
+        auto size = QSize(int(container.getScale() * image->width()),
+                          int(container.getScale() * image->height()));
+
+        container.addElement((new ImageLayoutElement(*this, image, size))
+                                 ->setLink(this->getLink()));
+    }
+}
+
+EmotePtr BadgeElement::getEmote() const
+{
+    return this->emote_;
 }
 
 // TEXT
@@ -138,7 +218,8 @@ TextElement::TextElement(const QString &text, MessageElementFlags flags,
     , color_(color)
     , style_(style)
 {
-    for (const auto &word : text.split(' ')) {
+    for (const auto &word : text.split(' '))
+    {
         this->words_.push_back({word, -1});
         // fourtf: add logic to store multiple spaces after message
     }
@@ -149,28 +230,30 @@ void TextElement::addToContainer(MessageLayoutContainer &container,
 {
     auto app = getApp();
 
-    if (flags.hasAny(this->getFlags())) {
+    if (flags.hasAny(this->getFlags()))
+    {
         QFontMetrics metrics =
             app->fonts->getFontMetrics(this->style_, container.getScale());
 
-        for (Word &word : this->words_) {
+        for (Word &word : this->words_)
+        {
             auto getTextLayoutElement = [&](QString text, int width,
-                                            bool trailingSpace) {
-                QColor color = this->color_.getColor(*app->themes);
+                                            bool hasTrailingSpace) {
+                auto color = this->color_.getColor(*app->themes);
                 app->themes->normalizeColor(color);
 
                 auto e = (new TextLayoutElement(
                               *this, text, QSize(width, metrics.height()),
                               color, this->style_, container.getScale()))
                              ->setLink(this->getLink());
-                e->setTrailingSpace(trailingSpace);
+                e->setTrailingSpace(hasTrailingSpace);
                 e->setText(text);
 
                 // If URL link was changed,
                 // Should update it in MessageLayoutElement too!
-                if (this->getLink().type == Link::Url) {
-                    this->linkChanged.connect(
-                        [this, e]() { e->setLink(this->getLink()); });
+                if (this->getLink().type == Link::Url)
+                {
+                    static_cast<TextLayoutElement *>(e)->listenToLinkChanges();
                 }
                 return e;
             };
@@ -181,17 +264,20 @@ void TextElement::addToContainer(MessageLayoutContainer &container,
             //            }
 
             // see if the text fits in the current line
-            if (container.fitsInLine(word.width)) {
+            if (container.fitsInLine(word.width))
+            {
                 container.addElementNoLineBreak(getTextLayoutElement(
                     word.text, word.width, this->hasTrailingSpace()));
                 continue;
             }
 
             // see if the text fits in the next line
-            if (!container.atStartOfLine()) {
+            if (!container.atStartOfLine())
+            {
                 container.breakLine();
 
-                if (container.fitsInLine(word.width)) {
+                if (container.fitsInLine(word.width))
+                {
                     container.addElementNoLineBreak(getTextLayoutElement(
                         word.text, word.width, this->hasTrailingSpace()));
                     continue;
@@ -202,26 +288,36 @@ void TextElement::addToContainer(MessageLayoutContainer &container,
             QString text = word.text;
             int textLength = text.length();
             int wordStart = 0;
-            int width = metrics.width(text[0]);
+            int width = 0;
 
-            for (int i = 1; i < textLength; i++) {
-                int charWidth = metrics.width(text[i]);
+            // QChar::isHighSurrogate(text[0].unicode()) ? 2 : 1
 
-                if (!container.fitsInLine(width + charWidth)) {
+            for (int i = 0; i < textLength; i++)  //
+            {
+                auto isSurrogate = text.size() > i + 1 &&
+                                   QChar::isHighSurrogate(text[i].unicode());
+
+                auto charWidth = isSurrogate ? metrics.width(text.mid(i, 2))
+                                             : metrics.width(text[i]);
+
+                if (!container.fitsInLine(width + charWidth))  //
+                {
                     container.addElementNoLineBreak(getTextLayoutElement(
                         text.mid(wordStart, i - wordStart), width, false));
                     container.breakLine();
 
                     wordStart = i;
-                    width = 0;
-                    if (textLength > i + 2) {
-                        width += metrics.width(text[i]);
-                        width += metrics.width(text[i + 1]);
-                        i += 1;
-                    }
+                    width = charWidth;
+
+                    if (isSurrogate)
+                        i++;
                     continue;
                 }
+
                 width += charWidth;
+
+                if (isSurrogate)
+                    i++;
             }
 
             container.addElement(getTextLayoutElement(
@@ -243,9 +339,10 @@ TimestampElement::TimestampElement(QTime time)
 void TimestampElement::addToContainer(MessageLayoutContainer &container,
                                       MessageElementFlags flags)
 {
-    if (flags.hasAny(this->getFlags())) {
-        auto app = getApp();
-        if (getSettings()->timestampFormat != this->format_) {
+    if (flags.hasAny(this->getFlags()))
+    {
+        if (getSettings()->timestampFormat != this->format_)
+        {
             this->format_ = getSettings()->timestampFormat.getValue();
             this->element_.reset(this->formatTime(this->time_));
         }
@@ -273,17 +370,21 @@ TwitchModerationElement::TwitchModerationElement()
 void TwitchModerationElement::addToContainer(MessageLayoutContainer &container,
                                              MessageElementFlags flags)
 {
-    if (flags.has(MessageElementFlag::ModeratorTools)) {
+    if (flags.has(MessageElementFlag::ModeratorTools))
+    {
         QSize size(int(container.getScale() * 16),
                    int(container.getScale() * 16));
 
-        for (const auto &action :
-             getApp()->moderationActions->items.getVector()) {
-            if (auto image = action.getImage()) {
+        for (const auto &action : getApp()->moderationActions->items)
+        {
+            if (auto image = action.getImage())
+            {
                 container.addElement(
                     (new ImageLayoutElement(*this, image.get(), size))
                         ->setLink(Link(Link::UserAction, action.getAction())));
-            } else {
+            }
+            else
+            {
                 container.addElement(
                     (new TextIconLayoutElement(*this, action.getLine1(),
                                                action.getLine2(),

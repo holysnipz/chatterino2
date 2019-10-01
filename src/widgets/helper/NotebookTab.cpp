@@ -29,32 +29,20 @@ NotebookTab::NotebookTab(Notebook *notebook)
     , notebook_(notebook)
     , menu_(this)
 {
-    auto app = getApp();
-
     this->setAcceptDrops(true);
 
     this->positionChangedAnimation_.setEasingCurve(
         QEasingCurve(QEasingCurve::InCubic));
 
-    getSettings()->showTabCloseButton.connect(
-        boost::bind(&NotebookTab::hideTabXChanged, this, _1),
+    getSettings()->showTabCloseButton.connectSimple(
+        boost::bind(&NotebookTab::hideTabXChanged, this),
         this->managedConnections_);
+    getSettings()->showTabLive.connect([this](auto, auto) { this->update(); },
+                                       this->managedConnections_);
 
     this->setMouseTracking(true);
 
-    this->menu_.addAction("Rename", [this]() {
-        TextInputDialog d(this);
-
-        d.setWindowTitle(
-            "Change tab title (Leave empty for default behaviour)");
-        d.setText(this->getCustomTitle());
-        d.highlightText();
-
-        if (d.exec() == QDialog::Accepted) {
-            QString newTitle = d.getText();
-            this->setCustomTitle(newTitle);
-        }
-    });
+    this->menu_.addAction("Rename", [this]() { this->showRenameDialog(); });
 
     this->menu_.addAction("Close",
                           [=]() { this->notebook_->removePage(this->page); });
@@ -69,6 +57,21 @@ NotebookTab::NotebookTab(Notebook *notebook)
     this->menu_.addAction(highlightNewMessagesAction_);
 }
 
+void NotebookTab::showRenameDialog()
+{
+    TextInputDialog d(this);
+
+    d.setWindowTitle("Choose tab title (Empty for default)");
+    d.setText(this->getCustomTitle());
+    d.highlightText();
+
+    if (d.exec() == QDialog::Accepted)
+    {
+        QString newTitle = d.getText();
+        this->setCustomTitle(newTitle);
+    }
+}
+
 void NotebookTab::themeChangedEvent()
 {
     this->update();
@@ -79,23 +82,35 @@ void NotebookTab::themeChangedEvent()
 
 void NotebookTab::updateSize()
 {
-    float scale = getScale();
+    float scale = this->scale();
 
     int width;
     QFontMetrics metrics = getApp()->fonts->getFontMetrics(
         FontStyle::UiTabs,
-        float(qreal(this->getScale()) * this->devicePixelRatioF()));
+        float(qreal(this->scale()) * this->devicePixelRatioF()));
 
-    if (this->hasXButton()) {
+    if (this->hasXButton())
+    {
         width = (metrics.width(this->getTitle()) + int(32 * scale));
-    } else {
+    }
+    else
+    {
         width = (metrics.width(this->getTitle()) + int(16 * scale));
     }
 
-    width = clamp(width, this->height(), int(150 * scale));
+    if (this->height() > 150 * scale)
+    {
+        width = this->height();
+    }
+    else
+    {
+        width = clamp(width, this->height(), int(150 * scale));
+    }
+    auto height = int(NOTEBOOK_TAB_HEIGHT * scale);
 
-    if (this->width() != width) {
-        this->resize(width, int(NOTEBOOK_TAB_HEIGHT * scale));
+    if (this->width() != width || this->height() != height)
+    {
+        this->resize(width, height);
         this->notebook_->performLayout();
     }
 }
@@ -107,7 +122,8 @@ const QString &NotebookTab::getCustomTitle() const
 
 void NotebookTab::setCustomTitle(const QString &newTitle)
 {
-    if (this->customTitle_ != newTitle) {
+    if (this->customTitle_ != newTitle)
+    {
         this->customTitle_ = newTitle;
         this->titleUpdated();
     }
@@ -125,10 +141,12 @@ bool NotebookTab::hasCustomTitle() const
 
 void NotebookTab::setDefaultTitle(const QString &title)
 {
-    if (this->defaultTitle_ != title) {
+    if (this->defaultTitle_ != title)
+    {
         this->defaultTitle_ = title;
 
-        if (this->customTitle_.isEmpty()) {
+        if (this->customTitle_.isEmpty())
+        {
             this->titleUpdated();
         }
     }
@@ -168,9 +186,19 @@ void NotebookTab::setSelected(bool value)
     this->update();
 }
 
+void NotebookTab::setInLastRow(bool value)
+{
+    if (this->isInLastRow_ != value)
+    {
+        this->isInLastRow_ = value;
+        this->update();
+    }
+}
+
 void NotebookTab::setLive(bool isLive)
 {
-    if (this->isLive_ != isLive) {
+    if (this->isLive_ != isLive)
+    {
         this->isLive_ = isLive;
         this->update();
     }
@@ -178,10 +206,13 @@ void NotebookTab::setLive(bool isLive)
 
 void NotebookTab::setHighlightState(HighlightState newHighlightStyle)
 {
-    if (this->isSelected() || !this->highlightEnabled_) {
+    if (this->isSelected() || (!this->highlightEnabled_ &&
+                               newHighlightStyle == HighlightState::NewMessage))
+    {
         return;
     }
-    if (this->highlightState_ != HighlightState::Highlighted) {
+    if (this->highlightState_ != HighlightState::Highlighted)
+    {
         this->highlightState_ = newHighlightStyle;
 
         this->update();
@@ -204,7 +235,7 @@ QRect NotebookTab::getDesiredRect() const
     return QRect(this->positionAnimationDesiredPoint_, size());
 }
 
-void NotebookTab::hideTabXChanged(bool)
+void NotebookTab::hideTabXChanged()
 {
     this->updateSize();
     this->update();
@@ -217,14 +248,16 @@ void NotebookTab::moveAnimated(QPoint pos, bool animated)
     QWidget *w = this->window();
 
     if ((w != nullptr && !w->isVisible()) || !animated ||
-        !this->positionChangedAnimationRunning_) {
+        !this->positionChangedAnimationRunning_)
+    {
         this->move(pos);
 
         this->positionChangedAnimationRunning_ = true;
         return;
     }
 
-    if (this->positionChangedAnimation_.endValue() == pos) {
+    if (this->positionChangedAnimation_.endValue() == pos)
+    {
         return;
     }
 
@@ -239,7 +272,7 @@ void NotebookTab::paintEvent(QPaintEvent *)
 {
     auto app = getApp();
     QPainter painter(this);
-    float scale = this->getScale();
+    float scale = this->scale();
 
     painter.setFont(getApp()->fonts->getFont(
         FontStyle::UiTabs,
@@ -249,70 +282,54 @@ void NotebookTab::paintEvent(QPaintEvent *)
         scale * 96.f / this->logicalDpiX() * this->devicePixelRatioF());
 
     int height = int(scale * NOTEBOOK_TAB_HEIGHT);
-    //    int fullHeight = (int)(scale * 48);
 
     // select the right tab colors
     Theme::TabColors colors;
     Theme::TabColors regular = this->theme->tabs.regular;
 
-    if (this->selected_) {
+    if (this->selected_)
         colors = this->theme->tabs.selected;
-    } else if (this->highlightState_ == HighlightState::Highlighted) {
+    else if (this->highlightState_ == HighlightState::Highlighted)
         colors = this->theme->tabs.highlighted;
-    } else if (this->highlightState_ == HighlightState::NewMessage) {
+    else if (this->highlightState_ == HighlightState::NewMessage)
         colors = this->theme->tabs.newMessage;
-    } else {
+    else
         colors = this->theme->tabs.regular;
-    }
 
     bool windowFocused = this->window() == QApplication::activeWindow();
-    // || SettingsDialog::getHandle() == QApplication::activeWindow();
 
     QBrush tabBackground = /*this->mouseOver_ ? colors.backgrounds.hover
                                             :*/
         (windowFocused ? colors.backgrounds.regular
                        : colors.backgrounds.unfocused);
 
-    //    painter.fillRect(rect(), this->mouseOver_ ? regular.backgrounds.hover
-    //                                              : (windowFocused ?
-    //                                              regular.backgrounds.regular
-    //                                                               :
-    //                                                               regular.backgrounds.unfocused));
-
     // fill the tab background
     auto bgRect = rect();
-    bgRect.setTop(bgRect.top() + 2);
+    bgRect.setTop(ceil((this->selected_ ? 0.f : 1.f) * scale));
 
     painter.fillRect(bgRect, tabBackground);
 
-    // draw border
-    //    painter.setPen(QPen("#fff"));
-    //    QPainterPath path(QPointF(0, height));
-    //    path.lineTo(0, 0);
-    //    path.lineTo(this->width() - 1, 0);
-    //    path.lineTo(this->width() - 1, this->height() - 1);
-    //    path.lineTo(0, this->height() - 1);
-    //    painter.drawPath(path);
-
     // top line
     painter.fillRect(
-        QRectF(0, (this->selected_ ? 0.f : 1.f) * scale, this->width(),
-               (this->selected_ ? 2.f : 1.f) * scale),
+        QRectF(0, ceil((this->selected_ ? 0.f : 1.f) * scale), this->width(),
+               ceil((this->selected_ ? 2.f : 1.f) * scale)),
         this->mouseOver_
             ? colors.line.hover
             : (windowFocused ? colors.line.regular : colors.line.unfocused));
 
     // draw live indicator
-    if (this->isLive_) {
+    if (this->isLive_ && getSettings()->showTabLive)
+    {
         painter.setPen(QColor(Qt::GlobalColor::red));
+        painter.setRenderHint(QPainter::Antialiasing);
         QBrush b;
         b.setColor(QColor(Qt::GlobalColor::red));
         b.setStyle(Qt::SolidPattern);
         painter.setBrush(b);
 
-        auto x = this->width() - (7.f * scale);
-        auto y = 4.f * scale;
-        auto diameter = 4.f * scale;
+        auto x = this->width() - (7 * scale);
+        auto y = 4 * scale + (this->isSelected() ? 0 : 1);
+        auto diameter = 4 * scale;
         painter.drawEllipse(QRectF(x, y, diameter, diameter));
     }
 
@@ -328,7 +345,8 @@ void NotebookTab::paintEvent(QPaintEvent *)
     QRect textRect(offset, this->selected_ ? 1 : 2,
                    this->width() - offset - offset, height);
 
-    if (this->shouldDrawXButton()) {
+    if (this->shouldDrawXButton())
+    {
         textRect.setRight(textRect.right() - this->height() / 2);
     }
 
@@ -342,17 +360,24 @@ void NotebookTab::paintEvent(QPaintEvent *)
     painter.drawText(textRect, this->getTitle(), option);
 
     // draw close x
-    if (this->shouldDrawXButton()) {
+    if (this->shouldDrawXButton())
+    {
+        painter.setRenderHint(QPainter::Antialiasing, false);
+
         QRect xRect = this->getXRect();
-        if (!xRect.isNull()) {
-            if (this->selected_) xRect.moveTop(xRect.top() - 1);
+        if (!xRect.isNull())
+        {
+            if (this->selected_)
+                xRect.moveTop(xRect.top() - 1);
 
             painter.setBrush(QColor("#fff"));
 
-            if (this->mouseOverX_) {
+            if (this->mouseOverX_)
+            {
                 painter.fillRect(xRect, QColor(0, 0, 0, 64));
 
-                if (this->mouseDownX_) {
+                if (this->mouseDownX_)
+                {
                     painter.fillRect(xRect, QColor(0, 0, 0, 64));
                 }
             }
@@ -366,12 +391,17 @@ void NotebookTab::paintEvent(QPaintEvent *)
         }
     }
 
+    // draw mouse over effect
+    if (!this->selected_)
+    {
+        this->fancyPaint(painter);
+    }
+
     // draw line at bottom
-    if (!this->selected_) {
+    if (!this->selected_ && this->isInLastRow_)
+    {
         painter.fillRect(0, this->height() - 1, this->width(), 1,
                          app->themes->window.background);
-
-        this->fancyPaint(painter);
     }
 }
 
@@ -388,7 +418,8 @@ bool NotebookTab::shouldDrawXButton()
 
 void NotebookTab::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton) {
+    if (event->button() == Qt::LeftButton)
+    {
         this->mouseDown_ = true;
         this->mouseDownX_ = this->getXRect().contains(event->pos());
 
@@ -397,11 +428,14 @@ void NotebookTab::mousePressEvent(QMouseEvent *event)
 
     this->update();
 
-    if (this->notebook_->getAllowUserTabManagement()) {
-        switch (event->button()) {
+    if (this->notebook_->getAllowUserTabManagement())
+    {
+        switch (event->button())
+        {
             case Qt::RightButton: {
                 this->menu_.popup(event->globalPos());
-            } break;
+            }
+            break;
             default:;
         }
     }
@@ -417,24 +451,41 @@ void NotebookTab::mouseReleaseEvent(QMouseEvent *event)
             "Are you sure that you want to remove this tab?",
             QMessageBox::Yes | QMessageBox::Cancel);
 
-        if (reply == QMessageBox::Yes) {
+        if (reply == QMessageBox::Yes)
+        {
             this->notebook_->removePage(this->page);
         }
     };
 
-    if (event->button() == Qt::MiddleButton) {
-        if (this->rect().contains(event->pos())) {
+    if (event->button() == Qt::MiddleButton)
+    {
+        if (this->rect().contains(event->pos()))
+        {
             removeThisPage();
         }
-    } else {
+    }
+    else
+    {
         if (this->hasXButton() && this->mouseDownX_ &&
-            this->getXRect().contains(event->pos())) {
+            this->getXRect().contains(event->pos()))
+        {
             this->mouseDownX_ = false;
 
             removeThisPage();
-        } else {
+        }
+        else
+        {
             this->update();
         }
+    }
+}
+
+void NotebookTab::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton &&
+        this->notebook_->getAllowUserTabManagement())
+    {
+        this->showRenameDialog();
     }
 }
 
@@ -459,25 +510,27 @@ void NotebookTab::leaveEvent(QEvent *event)
 
 void NotebookTab::dragEnterEvent(QDragEnterEvent *event)
 {
-    if (!event->mimeData()->hasFormat("chatterino/split")) return;
+    if (!event->mimeData()->hasFormat("chatterino/split"))
+        return;
 
-    if (!SplitContainer::isDraggingSplit) return;
+    if (!SplitContainer::isDraggingSplit)
+        return;
 
-    if (this->notebook_->getAllowUserTabManagement()) {
+    if (this->notebook_->getAllowUserTabManagement())
+    {
         this->notebook_->select(this->page);
     }
 }
 
 void NotebookTab::mouseMoveEvent(QMouseEvent *event)
 {
-    auto app = getApp();
-
     if (getSettings()->showTabCloseButton &&
         this->notebook_->getAllowUserTabManagement())  //
     {
         bool overX = this->getXRect().contains(event->pos());
 
-        if (overX != this->mouseOverX_) {
+        if (overX != this->mouseOverX_)
+        {
             // Over X state has been changed (we either left or entered it;
             this->mouseOverX_ = overX;
 
@@ -494,7 +547,8 @@ void NotebookTab::mouseMoveEvent(QMouseEvent *event)
         QWidget *clickedPage =
             this->notebook_->tabAt(relPoint, index, this->width());
 
-        if (clickedPage != nullptr && clickedPage != this->page) {
+        if (clickedPage != nullptr && clickedPage != this->page)
+        {
             this->notebook_->rearrangePage(this->page, index);
         }
     }
@@ -504,10 +558,27 @@ void NotebookTab::mouseMoveEvent(QMouseEvent *event)
 
 void NotebookTab::wheelEvent(QWheelEvent *event)
 {
-    if (event->delta() > 0) {
-        this->notebook_->selectPreviousTab();
-    } else {
-        this->notebook_->selectNextTab();
+    const auto defaultMouseDelta = 120;
+    const auto delta = event->delta();
+    const auto selectTab = [this](int delta) {
+        delta > 0 ? this->notebook_->selectPreviousTab()
+                  : this->notebook_->selectNextTab();
+    };
+    // If it's true
+    // Then the user uses the trackpad or perhaps the most accurate mouse
+    // Which has small delta.
+    if (std::abs(delta) < defaultMouseDelta)
+    {
+        this->mouseWheelDelta_ += delta;
+        if (std::abs(this->mouseWheelDelta_) >= defaultMouseDelta)
+        {
+            selectTab(this->mouseWheelDelta_);
+            this->mouseWheelDelta_ = 0;
+        }
+    }
+    else
+    {
+        selectTab(delta);
     }
 }
 
@@ -517,7 +588,7 @@ QRect NotebookTab::getXRect()
     //        return QRect();
     //    }
 
-    float s = this->getScale();
+    float s = this->scale();
     return QRect(this->width() - static_cast<int>(20 * s),
                  static_cast<int>(9 * s), static_cast<int>(16 * s),
                  static_cast<int>(16 * s));

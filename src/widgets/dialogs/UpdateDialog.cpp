@@ -11,9 +11,8 @@
 namespace chatterino {
 
 UpdateDialog::UpdateDialog()
-    : BaseWindow(nullptr,
-                 BaseWindow::Flags(BaseWindow::Frameless | BaseWindow::TopMost |
-                                   BaseWindow::EnableCustomFrame))
+    : BaseWindow({BaseWindow::Frameless, BaseWindow::TopMost,
+                  BaseWindow::EnableCustomFrame})
 {
     auto layout =
         LayoutCreator<UpdateDialog>(this).setLayoutType<QVBoxLayout>();
@@ -26,8 +25,10 @@ UpdateDialog::UpdateDialog()
     this->ui_.installButton = install;
     auto dismiss = buttons->addButton("Dismiss", QDialogButtonBox::RejectRole);
 
-    QObject::connect(install, &QPushButton::clicked, this,
-                     [this] { this->close(); });
+    QObject::connect(install, &QPushButton::clicked, this, [this] {
+        Updates::getInstance().installUpdates();
+        this->close();
+    });
     QObject::connect(dismiss, &QPushButton::clicked, this, [this] {
         this->buttonClicked.invoke(Dismiss);
         this->close();
@@ -37,37 +38,46 @@ UpdateDialog::UpdateDialog()
     this->connections_.managedConnect(
         Updates::getInstance().statusUpdated,
         [this](auto status) { this->updateStatusChanged(status); });
+
+    this->setScaleIndependantHeight(150);
 }
 
 void UpdateDialog::updateStatusChanged(Updates::Status status)
 {
     this->ui_.installButton->setVisible(status == Updates::UpdateAvailable);
 
-    switch (status) {
+    switch (status)
+    {
         case Updates::UpdateAvailable: {
             this->ui_.label->setText(
                 QString("An update (%1) is available.\n\nDo you want to "
                         "download and install it?")
                     .arg(Updates::getInstance().getOnlineVersion()));
-        } break;
+            this->updateGeometry();
+        }
+        break;
 
         case Updates::SearchFailed: {
             this->ui_.label->setText("Failed to load version information.");
-        } break;
+        }
+        break;
 
         case Updates::Downloading: {
             this->ui_.label->setText(
                 "Downloading updates.\n\nChatterino will restart "
                 "automatically when the download is done.");
-        } break;
+        }
+        break;
 
         case Updates::DownloadFailed: {
             this->ui_.label->setText("Failed to download the update.");
-        } break;
+        }
+        break;
 
         case Updates::WriteFileFailed: {
             this->ui_.label->setText("Failed to save the update to disk.");
-        } break;
+        }
+        break;
 
         default:;
     }

@@ -93,6 +93,13 @@ public:
         return *this;
     }
 
+    LayoutCreator<T> withoutSpacing()
+    {
+        this->item_->setSpacing(0);
+
+        return *this;
+    }
+
     template <typename Q = T,
               typename std::enable_if<std::is_base_of<QWidget, Q>::value,
                                       int>::type = 0>
@@ -117,6 +124,20 @@ public:
         this->item_->addTab(widget, title);
 
         return LayoutCreator<T2>(item);
+    }
+
+    template <typename Slot, typename Func>
+    LayoutCreator<T> connect(Slot slot, QObject *receiver, Func func)
+    {
+        QObject::connect(this->getElement(), slot, receiver, func);
+        return *this;
+    }
+
+    template <typename Func>
+    LayoutCreator<T> onClick(QObject *receiver, Func func)
+    {
+        QObject::connect(this->getElement(), &T::clicked, receiver, func);
+        return *this;
     }
 
 private:
@@ -153,12 +174,21 @@ private:
                                       int>::type = 0>
     QLayout *getOrCreateLayout()
     {
-        if (!this->item_->layout()) {
+        if (!this->item_->layout())
+        {
             this->item_->setLayout(new QHBoxLayout());
         }
 
         return this->item_->layout();
     }
 };
+
+template <typename T, typename... Args>
+LayoutCreator<T> makeDialog(Args &&... args)
+{
+    T *t = new T(std::forward<Args>(args)...);
+    t->setAttribute(Qt::WA_DeleteOnClose);
+    return LayoutCreator<T>(t);
+}
 
 }  // namespace chatterino

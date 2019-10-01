@@ -5,6 +5,7 @@
 #include "common/NetworkRequest.hpp"
 #include "controllers/accounts/AccountController.hpp"
 #include "providers/twitch/PartialTwitchUser.hpp"
+#include "util/Helpers.hpp"
 
 #ifdef USEWINSDK
 #    include <Windows.h>
@@ -21,28 +22,38 @@ namespace chatterino {
 
 namespace {
 
-    void LogInWithCredentials(const std::string &userID,
-                              const std::string &username,
-                              const std::string &clientID,
-                              const std::string &oauthToken)
+    void LogInWithCredentials(const QString &userID, const QString &username,
+                              const QString &clientID,
+                              const QString &oauthToken)
     {
         QStringList errors;
 
-        if (userID.empty()) {
+        if (userID.isEmpty())
+        {
             errors.append("Missing user ID");
         }
-        if (username.empty()) {
+        if (username.isEmpty())
+        {
             errors.append("Missing username");
         }
-        if (clientID.empty()) {
+        if (clientID.isEmpty())
+        {
             errors.append("Missing Client ID");
         }
-        if (oauthToken.empty()) {
+        if (oauthToken.isEmpty())
+        {
             errors.append("Missing OAuth Token");
         }
 
-        if (errors.length() > 0) {
+        if (errors.length() > 0)
+        {
             QMessageBox messageBox;
+// Set error window on top
+#ifdef USEWINSDK
+            ::SetWindowPos(HWND(messageBox.winId()), HWND_TOPMOST, 0, 0, 0, 0,
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+
+#endif
             messageBox.setIcon(QMessageBox::Critical);
             messageBox.setText(errors.join("<br />"));
             messageBox.setStandardButtons(QMessageBox::Ok);
@@ -54,14 +65,14 @@ namespace {
         //    messageBox.setIcon(QMessageBox::Information);
         //    messageBox.setText("Successfully logged in with user <b>" +
         //    qS(username) + "</b>!");
-        pajlada::Settings::Setting<std::string>::set(
-            "/accounts/uid" + userID + "/username", username);
-        pajlada::Settings::Setting<std::string>::set(
-            "/accounts/uid" + userID + "/userID", userID);
-        pajlada::Settings::Setting<std::string>::set(
-            "/accounts/uid" + userID + "/clientID", clientID);
-        pajlada::Settings::Setting<std::string>::set(
-            "/accounts/uid" + userID + "/oauthToken", oauthToken);
+        auto basePath = fS("/accounts/uid{}", userID);
+        pajlada::Settings::Setting<QString>::set(basePath + "/username",
+                                                 username);
+        pajlada::Settings::Setting<QString>::set(basePath + "/userID", userID);
+        pajlada::Settings::Setting<QString>::set(basePath + "/clientID",
+                                                 clientID);
+        pajlada::Settings::Setting<QString>::set(basePath + "/oauthToken",
+                                                 oauthToken);
 
         getApp()->accounts->twitch.reloadUsers();
 
@@ -77,7 +88,7 @@ BasicLoginWidget::BasicLoginWidget()
     this->setLayout(&this->ui_.layout);
 
     this->ui_.loginButton.setText("Log in (Opens in browser)");
-    this->ui_.pasteCodeButton.setText("Paste code");
+    this->ui_.pasteCodeButton.setText("Paste login info");
 
     this->ui_.horizontalLayout.addWidget(&this->ui_.loginButton);
     this->ui_.horizontalLayout.addWidget(&this->ui_.pasteCodeButton);
@@ -94,25 +105,36 @@ BasicLoginWidget::BasicLoginWidget()
         QString clipboardString = clipboard->text();
         QStringList parameters = clipboardString.split(';');
 
-        std::string oauthToken, clientID, username, userID;
+        QString oauthToken, clientID, username, userID;
 
-        for (const auto &param : parameters) {
+        for (const auto &param : parameters)
+        {
             QStringList kvParameters = param.split('=');
-            if (kvParameters.size() != 2) {
+            if (kvParameters.size() != 2)
+            {
                 continue;
             }
             QString key = kvParameters[0];
             QString value = kvParameters[1];
 
-            if (key == "oauth_token") {
-                oauthToken = value.toStdString();
-            } else if (key == "client_id") {
-                clientID = value.toStdString();
-            } else if (key == "username") {
-                username = value.toStdString();
-            } else if (key == "user_id") {
-                userID = value.toStdString();
-            } else {
+            if (key == "oauth_token")
+            {
+                oauthToken = value;
+            }
+            else if (key == "client_id")
+            {
+                clientID = value;
+            }
+            else if (key == "username")
+            {
+                username = value;
+            }
+            else if (key == "user_id")
+            {
+                userID = value;
+            }
+            else
+            {
                 qDebug() << "Unknown key in code: " << key;
             }
         }
@@ -176,16 +198,15 @@ AdvancedLoginWidget::AdvancedLoginWidget()
                 this->ui_.oauthTokenInput.clear();
             });
 
-    connect(
-        &this->ui_.buttonUpperRow.addUserButton, &QPushButton::clicked, [=]() {
-            std::string userID = this->ui_.userIDInput.text().toStdString();
-            std::string username = this->ui_.usernameInput.text().toStdString();
-            std::string clientID = this->ui_.clientIDInput.text().toStdString();
-            std::string oauthToken =
-                this->ui_.oauthTokenInput.text().toStdString();
+    connect(&this->ui_.buttonUpperRow.addUserButton, &QPushButton::clicked,
+            [=]() {
+                QString userID = this->ui_.userIDInput.text();
+                QString username = this->ui_.usernameInput.text();
+                QString clientID = this->ui_.clientIDInput.text();
+                QString oauthToken = this->ui_.oauthTokenInput.text();
 
-            LogInWithCredentials(userID, username, clientID, oauthToken);
-        });
+                LogInWithCredentials(userID, username, clientID, oauthToken);
+            });
 
     /// Lower button row
     this->ui_.buttonLowerRow.fillInUserIDButton.setText(
@@ -212,9 +233,12 @@ void AdvancedLoginWidget::refreshButtons()
     if (this->ui_.userIDInput.text().isEmpty() ||
         this->ui_.usernameInput.text().isEmpty() ||
         this->ui_.clientIDInput.text().isEmpty() ||
-        this->ui_.oauthTokenInput.text().isEmpty()) {
+        this->ui_.oauthTokenInput.text().isEmpty())
+    {
         this->ui_.buttonUpperRow.addUserButton.setEnabled(false);
-    } else {
+    }
+    else
+    {
         this->ui_.buttonUpperRow.addUserButton.setEnabled(true);
     }
 }

@@ -11,22 +11,25 @@ void initUpdateButton(Button &button,
     button.hide();
 
     // show update prompt when clicking the button
-    QObject::connect(&button, &Button::clicked, [&button] {
+    QObject::connect(&button, &Button::leftClicked, [&button] {
         auto dialog = new UpdateDialog();
         dialog->setActionOnFocusLoss(BaseWindow::Delete);
         dialog->move(button.mapToGlobal(
-            QPoint(int(-100 * button.getScale()), button.height())));
+            QPoint(int(-100 * button.scale()), button.height())));
         dialog->show();
         dialog->raise();
 
         dialog->buttonClicked.connect([&button](auto buttonType) {
-            switch (buttonType) {
+            switch (buttonType)
+            {
                 case UpdateDialog::Dismiss: {
                     button.hide();
-                } break;
+                }
+                break;
                 case UpdateDialog::Install: {
                     Updates::getInstance().installUpdates();
-                } break;
+                }
+                break;
             }
         });
 
@@ -39,8 +42,8 @@ void initUpdateButton(Button &button,
         button.setVisible(Updates::getInstance().shouldShowUpdateButton());
 
         auto imageUrl = Updates::getInstance().isError()
-                            ? ":/images/download_update_error.png"
-                            : ":/images/download_update.png";
+                            ? ":/buttons/updateError.png"
+                            : ":/buttons/update.png";
         button.setPixmap(QPixmap(imageUrl));
     };
 

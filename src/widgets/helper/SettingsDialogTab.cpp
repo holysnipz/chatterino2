@@ -23,7 +23,8 @@ SettingsDialogTab::SettingsDialogTab(SettingsDialog *_dialog,
 
 void SettingsDialogTab::setSelected(bool _selected)
 {
-    if (this->selected_ == _selected) {
+    if (this->selected_ == _selected)
+    {
         return;
     }
 
@@ -47,7 +48,7 @@ void SettingsDialogTab::paintEvent(QPaintEvent *)
 
     this->style()->drawPrimitive(QStyle::PE_Widget, &opt, &painter, this);
 
-    int a = (this->height() - (20 * this->getScale())) / 2;
+    int a = (this->height() - (20 * this->scale())) / 2;
     QPixmap pixmap = this->ui_.icon.pixmap(
         QSize(this->height() - a * 2, this->height() - a * 2));
 
@@ -61,11 +62,14 @@ void SettingsDialogTab::paintEvent(QPaintEvent *)
 
 void SettingsDialogTab::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() != Qt::LeftButton) {
+    if (event->button() != Qt::LeftButton)
+    {
         return;
     }
 
     this->dialog_->selectTab(this);
+
+    this->setFocus();
 }
 
 }  // namespace chatterino

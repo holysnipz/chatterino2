@@ -4,11 +4,16 @@
 #include <QFile>
 #include <QPalette>
 #include <QStyleFactory>
+#include <Qt>
+#include <csignal>
 
 #include "Application.hpp"
 #include "common/NetworkManager.hpp"
 #include "singletons/Paths.hpp"
+#include "singletons/Resources.hpp"
+#include "singletons/Settings.hpp"
 #include "singletons/Updates.hpp"
+#include "util/CombinePath.hpp"
 #include "widgets/dialogs/LastRunCrashDialog.hpp"
 
 #ifdef USEWINSDK
@@ -18,12 +23,6 @@
 #ifdef C_USE_BREAKPAD
 #    include <QBreakpadHandler.h>
 #endif
-
-// void initQt();
-// void installCustomPalette();
-// void showLastCrashDialog();
-// void createRunningFile(const QString &path);
-// void removeRunningFile(const QString &path);
 
 namespace chatterino {
 namespace {
@@ -77,17 +76,21 @@ namespace {
 
     void showLastCrashDialog()
     {
-#ifndef C_DISABLE_CRASH_DIALOG
-        LastRunCrashDialog dialog;
+        //#ifndef C_DISABLE_CRASH_DIALOG
+        //        LastRunCrashDialog dialog;
 
-        switch (dialog.exec()) {
-            case QDialog::Accepted: {
-            }; break;
-            default: {
-                _exit(0);
-            }
-        }
-#endif
+        //        switch (dialog.exec())
+        //        {
+        //            case QDialog::Accepted:
+        //            {
+        //            };
+        //            break;
+        //            default:
+        //            {
+        //                _exit(0);
+        //            }
+        //        }
+        //#endif
     }
 
     void createRunningFile(const QString &path)
@@ -103,11 +106,63 @@ namespace {
     {
         QFile::remove(path);
     }
+
+    std::chrono::steady_clock::time_point signalsInitTime;
+    bool restartOnSignal = false;
+
+    [[noreturn]] void handleSignal(int signum)
+    {
+        using namespace std::chrono_literals;
+
+        if (restartOnSignal &&
+            std::chrono::steady_clock::now() - signalsInitTime > 30s)
+        {
+            QProcess proc;
+            proc.setProgram(QApplication::applicationFilePath());
+            proc.setArguments({"--crash-recovery"});
+            proc.startDetached();
+        }
+
+        _exit(signum);
+    }
+
+    // We want to restart chatterino when it crashes and the setting is set to
+    // true.
+    void initSignalHandler()
+    {
+#ifndef C_DEBUG
+        signalsInitTime = std::chrono::steady_clock::now();
+
+        signal(SIGSEGV, handleSignal);
+#endif
+    }
 }  // namespace
 
 void runGui(QApplication &a, Paths &paths, Settings &settings)
 {
     initQt();
+    initResources();
+    initSignalHandler();
+
+    settings.restartOnCrash.connect(
+        [](const bool &value) { restartOnSignal = value; });
+
+    auto thread = std::thread([dir = paths.miscDirectory] {
+        {
+            auto path = combinePath(dir, "Update.exe");
+            if (QFile::exists(path))
+            {
+                QFile::remove(path);
+            }
+        }
+        {
+            auto path = combinePath(dir, "update.zip");
+            if (QFile::exists(path))
+            {
+                QFile::remove(path);
+            }
+        }
+    });
 
     chatterino::NetworkManager::init();
     chatterino::Updates::getInstance().checkForUpdates();
@@ -120,9 +175,12 @@ void runGui(QApplication &a, Paths &paths, Settings &settings)
     auto runningPath =
         paths.miscDirectory + "/running_" + paths.applicationFilePathHash;
 
-    if (QFile::exists(runningPath)) {
+    if (QFile::exists(runningPath))
+    {
         showLastCrashDialog();
-    } else {
+    }
+    else
+    {
         createRunningFile(runningPath);
     }
 
@@ -138,7 +196,7 @@ void runGui(QApplication &a, Paths &paths, Settings &settings)
     chatterino::NetworkManager::deinit();
 
 #ifdef USEWINSDK
-	// flushing windows clipboard to keep copied messages
+    // flushing windows clipboard to keep copied messages
     flushClipboard();
 #endif
 

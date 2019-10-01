@@ -6,6 +6,7 @@
 #include "messages/MessageBuilder.hpp"
 #include "singletons/Emotes.hpp"
 #include "singletons/Logging.hpp"
+#include "singletons/Settings.hpp"
 #include "singletons/WindowManager.hpp"
 
 #include <QJsonArray>
@@ -43,6 +44,11 @@ const QString &Channel::getName() const
     return this->name_;
 }
 
+const QString &Channel::getDisplayName() const
+{
+    return this->getName();
+}
+
 bool Channel::isTwitchChannel() const
 {
     return this->type_ >= Type::Twitch && this->type_ < Type::TwitchEnd;
@@ -64,18 +70,15 @@ void Channel::addMessage(MessagePtr message,
     auto app = getApp();
     MessagePtr deleted;
 
-    const QString &username = message->loginName;
-    if (!username.isEmpty()) {
-        // TODO: Add recent chatters display name
-        this->addRecentChatter(message);
-    }
-
     // FOURTF: change this when adding more providers
-    if (this->isTwitchChannel()) {
+    if (this->isTwitchChannel() &&
+        (!overridingFlags || !overridingFlags->has(MessageFlag::DoNotLog)))
+    {
         app->logging->addMessage(this->name_, message);
     }
 
-    if (this->messages_.pushBack(message, deleted)) {
+    if (this->messages_.pushBack(message, deleted))
+    {
         this->messageRemovedFromStart.invoke(deleted);
     }
 
@@ -85,7 +88,7 @@ void Channel::addMessage(MessagePtr message,
 void Channel::addOrReplaceTimeout(MessagePtr message)
 {
     LimitedQueueSnapshot<MessagePtr> snapshot = this->getMessageSnapshot();
-    int snapshotLength = snapshot.getLength();
+    int snapshotLength = snapshot.size();
 
     int end = std::max(0, snapshotLength - 20);
 
@@ -93,16 +96,32 @@ void Channel::addOrReplaceTimeout(MessagePtr message)
 
     QTime minimumTime = QTime::currentTime().addSecs(-5);
 
-    for (int i = snapshotLength - 1; i >= end; --i) {
+    auto timeoutStackStyle = static_cast<TimeoutStackStyle>(
+        getSettings()->timeoutStackStyle.getValue());
+
+    for (int i = snapshotLength - 1; i >= end; --i)
+    {
         auto &s = snapshot[i];
 
-        if (s->parseTime < minimumTime) {
+        if (s->parseTime < minimumTime)
+        {
             break;
         }
 
         if (s->flags.has(MessageFlag::Untimeout) &&
-            s->timeoutUser == message->timeoutUser) {
+            s->timeoutUser == message->timeoutUser)
+        {
             break;
+        }
+
+        if (timeoutStackStyle == TimeoutStackStyle::DontStackBeyondUserMessage)
+        {
+            if (s->loginName == message->timeoutUser &&
+                s->flags.hasNone({MessageFlag::Disabled, MessageFlag::Timeout,
+                                  MessageFlag::Untimeout}))
+            {
+                break;
+            }
         }
 
         if (s->flags.has(MessageFlag::Timeout) &&
@@ -118,7 +137,7 @@ void Channel::addOrReplaceTimeout(MessagePtr message)
             if (!message->flags.has(MessageFlag::PubSub) &&
                 s->flags.has(MessageFlag::PubSub))  //
             {
-                addMessage = false;
+                addMessage = timeoutStackStyle == TimeoutStackStyle::DontStack;
                 break;
             }
 
@@ -134,22 +153,27 @@ void Channel::addOrReplaceTimeout(MessagePtr message)
 
             this->replaceMessage(s, replacement.release());
 
-            return;
+            addMessage = false;
+            break;
         }
     }
 
     // disable the messages from the user
-    for (int i = 0; i < snapshotLength; i++) {
+    for (int i = 0; i < snapshotLength; i++)
+    {
         auto &s = snapshot[i];
-        if (s->flags.hasNone({MessageFlag::Timeout, MessageFlag::Untimeout}) &&
-            s->loginName == message->timeoutUser) {
+        if (s->loginName == message->timeoutUser &&
+            s->flags.hasNone({MessageFlag::Timeout, MessageFlag::Untimeout,
+                              MessageFlag::Whisper}))
+        {
             // FOURTF: disabled for now
             // PAJLADA: Shitty solution described in Message.hpp
             s->flags.set(MessageFlag::Disabled);
         }
     }
 
-    if (addMessage) {
+    if (addMessage)
+    {
         this->addMessage(message);
     }
 
@@ -160,11 +184,13 @@ void Channel::addOrReplaceTimeout(MessagePtr message)
 void Channel::disableAllMessages()
 {
     LimitedQueueSnapshot<MessagePtr> snapshot = this->getMessageSnapshot();
-    int snapshotLength = snapshot.getLength();
-    for (int i = 0; i < snapshotLength; i++) {
+    int snapshotLength = snapshot.size();
+    for (int i = 0; i < snapshotLength; i++)
+    {
         auto &message = snapshot[i];
-        if (message->flags.hasAny(
-                {MessageFlag::System, MessageFlag::Timeout})) {
+        if (message->flags.hasAny({MessageFlag::System, MessageFlag::Timeout,
+                                   MessageFlag::Whisper}))
+        {
             continue;
         }
 
@@ -178,7 +204,8 @@ void Channel::addMessagesAtStart(std::vector<MessagePtr> &_messages)
     std::vector<MessagePtr> addedMessages =
         this->messages_.pushFront(_messages);
 
-    if (addedMessages.size() != 0) {
+    if (addedMessages.size() != 0)
+    {
         this->messagesAddedAtStart.invoke(addedMessages);
     }
 }
@@ -187,13 +214,29 @@ void Channel::replaceMessage(MessagePtr message, MessagePtr replacement)
 {
     int index = this->messages_.replaceItem(message, replacement);
 
-    if (index >= 0) {
+    if (index >= 0)
+    {
         this->messageReplaced.invoke((size_t)index, replacement);
     }
 }
 
-void Channel::addRecentChatter(const MessagePtr &message)
+void Channel::deleteMessage(QString messageID)
 {
+    LimitedQueueSnapshot<MessagePtr> snapshot = this->getMessageSnapshot();
+    int snapshotLength = snapshot.size();
+
+    int end = std::max(0, snapshotLength - 200);
+
+    for (int i = snapshotLength - 1; i >= end; --i)
+    {
+        auto &s = snapshot[i];
+
+        if (s->id == messageID)
+        {
+            s->flags.set(MessageFlag::Disabled);
+            break;
+        }
+    }
 }
 
 bool Channel::canSendMessage() const
@@ -221,9 +264,29 @@ bool Channel::hasModRights() const
     return this->isMod() || this->isBroadcaster();
 }
 
+bool Channel::hasHighRateLimit() const
+{
+    return this->isMod() || this->isBroadcaster();
+}
+
 bool Channel::isLive() const
 {
     return false;
+}
+
+bool Channel::shouldIgnoreHighlights() const
+{
+    return this->type_ == Type::TwitchMentions ||
+           this->type_ == Type::TwitchWhispers;
+}
+
+bool Channel::canReconnect() const
+{
+    return false;
+}
+
+void Channel::reconnect()
+{
 }
 
 std::shared_ptr<Channel> Channel::getEmpty()
@@ -270,9 +333,12 @@ pajlada::Signals::NoArgSignal &IndirectChannel::getChannelChanged()
 
 Channel::Type IndirectChannel::getType()
 {
-    if (this->data_->type == Channel::Type::Direct) {
+    if (this->data_->type == Channel::Type::Direct)
+    {
         return this->get()->getType();
-    } else {
+    }
+    else
+    {
         return this->data_->type;
     }
 }

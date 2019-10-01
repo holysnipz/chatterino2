@@ -3,6 +3,7 @@
 #include "common/Channel.hpp"
 #include "common/FlagsEnum.hpp"
 #include "common/Singleton.hpp"
+#include "pajlada/settings/settinglistener.hpp"
 #include "widgets/splits/SplitContainer.hpp"
 
 namespace chatterino {
@@ -16,6 +17,8 @@ enum class MessageElementFlag;
 using MessageElementFlags = FlagsEnum<MessageElementFlag>;
 enum class WindowType;
 
+enum class SettingsDialogPreference;
+
 class WindowManager final : public Singleton
 {
 public:
@@ -24,14 +27,8 @@ public:
     static void encodeChannel(IndirectChannel channel, QJsonObject &obj);
     static IndirectChannel decodeChannel(const QJsonObject &obj);
 
-    static int clampUiScale(int scale);
-    static float getUiScaleValue();
-    static float getUiScaleValue(int scale);
-
-    static const int uiScaleMin;
-    static const int uiScaleMax;
-
-    void showSettingsDialog();
+    void showSettingsDialog(
+        SettingsDialogPreference preference = SettingsDialogPreference());
 
     // Show the account selector widget at point
     void showAccountSelectPopup(QPoint point);
@@ -49,7 +46,7 @@ public:
 
     Window &getMainWindow();
     Window &getSelectedWindow();
-    Window &createWindow(WindowType type);
+    Window &createWindow(WindowType type, bool show = true);
 
     int windowCount();
     Window *windowAt(int index);
@@ -64,14 +61,6 @@ public:
     MessageElementFlags getWordFlags();
     void updateWordTypeMask();
 
-    pajlada::Signals::NoArgSignal repaintGifs;
-
-    // This signal fires whenever views rendering a channel, or all views if the
-    // channel is a nullptr, need to redo their layout
-    pajlada::Signals::Signal<Channel *> layout;
-
-    pajlada::Signals::NoArgSignal wordFlagsChanged;
-
     // Sends an alert to the main window
     // It reads the `longAlert` setting to decide whether the alert will expire
     // or not
@@ -81,6 +70,15 @@ public:
     // If a save was already queued up, we reset the to happen in 10 seconds
     // again
     void queueSave();
+
+    /// Signals
+    pajlada::Signals::NoArgSignal gifRepaintRequested;
+
+    // This signal fires whenever views rendering a channel, or all views if the
+    // channel is a nullptr, need to redo their layout
+    pajlada::Signals::Signal<Channel *> layoutRequested;
+
+    pajlada::Signals::NoArgSignal wordFlagsChanged;
 
 private:
     void encodeNodeRecusively(SplitContainer::Node *node, QJsonObject &obj);
@@ -95,7 +93,7 @@ private:
     Window *selectedWindow_{};
 
     MessageElementFlags wordFlags_{};
-    pajlada::Settings::SettingListener wordFlagsListener_;
+    pajlada::SettingListener wordFlagsListener_;
 
     QTimer *saveTimer;
 };

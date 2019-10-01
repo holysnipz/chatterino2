@@ -12,6 +12,7 @@ class TwitchAccount;
 struct ActionUser;
 
 const rapidjson::Value &getArgs(const rapidjson::Value &data);
+const rapidjson::Value &getMsgID(const rapidjson::Value &data);
 
 bool getCreatedByUser(const rapidjson::Value &data, ActionUser &user);
 
@@ -32,7 +33,8 @@ void runAfter(boost::asio::io_service &ioService, Duration duration,
     timer->expires_from_now(duration);
 
     timer->async_wait([timer, cb](const boost::system::error_code &ec) {
-        if (ec) {
+        if (ec)
+        {
             log("Error in runAfter: {}", ec.message());
             return;
         }
@@ -49,7 +51,8 @@ void runAfter(std::shared_ptr<boost::asio::steady_timer> timer,
     timer->expires_from_now(duration);
 
     timer->async_wait([timer, cb](const boost::system::error_code &ec) {
-        if (ec) {
+        if (ec)
+        {
             log("Error in runAfter: {}", ec.message());
             return;
         }

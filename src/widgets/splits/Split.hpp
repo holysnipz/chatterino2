@@ -62,7 +62,6 @@ public:
                                 std::function<void(bool)> callback);
     void giveFocus(Qt::FocusReason reason);
     bool hasFocus() const;
-    void layoutMessages();
     void updateGifEmotes();
     void updateLastReadMessage();
     void setIsTopRightSplit(bool value);
@@ -130,6 +129,8 @@ public slots:
     void copyToClipboard();
     void showSearch();
     void showViewerList();
+    void openSubPage();
+    void reloadChannelAndSubscriberEmotes();
 };
 
 }  // namespace chatterino

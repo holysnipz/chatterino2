@@ -6,7 +6,10 @@
 #include "controllers/notifications/NotificationController.hpp"
 #include "providers/twitch/TwitchChannel.hpp"
 #include "providers/twitch/TwitchCommon.hpp"
-#include "providers/twitch/TwitchServer.hpp"
+#include "providers/twitch/TwitchIrcServer.hpp"
+#include "singletons/Paths.hpp"
+#include "util/StreamLink.hpp"
+#include "widgets/helper/CommonTexts.hpp"
 
 #ifdef Q_OS_WIN
 
@@ -24,13 +27,40 @@
 
 namespace chatterino {
 
+std::map<ToastReaction, QString> Toasts::reactionToString = {
+    {ToastReaction::OpenInBrowser, OPEN_IN_BROWSER},
+    {ToastReaction::OpenInPlayer, OPEN_PLAYER_IN_BROWSER},
+    {ToastReaction::OpenInStreamlink, OPEN_IN_STREAMLINK},
+    {ToastReaction::DontOpen, DONT_OPEN}};
+
 bool Toasts::isEnabled()
 {
 #ifdef Q_OS_WIN
     return WinToastLib::WinToast::isCompatible() &&
            getSettings()->notificationToast;
-#endif
+#else
     return false;
+#endif
+}
+
+QString Toasts::findStringFromReaction(const ToastReaction &reaction)
+{
+    auto iterator = Toasts::reactionToString.find(reaction);
+    if (iterator != Toasts::reactionToString.end())
+    {
+        return iterator->second;
+    }
+    else
+    {
+        return DONT_OPEN;
+    }
+}
+
+QString Toasts::findStringFromReaction(
+    const pajlada::Settings::Setting<int> &value)
+{
+    int i = static_cast<int>(value);
+    return Toasts::findStringFromReaction(static_cast<ToastReaction>(i));
 }
 
 void Toasts::sendChannelNotification(const QString &channelName, Platform p)
@@ -45,12 +75,16 @@ void Toasts::sendChannelNotification(const QString &channelName, Platform p)
     };
 #endif
     // Fetch user profile avatar
-    if (p == Platform::Twitch) {
+    if (p == Platform::Twitch)
+    {
         QFileInfo check_file(getPaths()->twitchProfileAvatars + "/twitch/" +
                              channelName + ".png");
-        if (check_file.exists() && check_file.isFile()) {
+        if (check_file.exists() && check_file.isFile())
+        {
             sendChannelNotification();
-        } else {
+        }
+        else
+        {
             this->fetchChannelAvatar(
                 channelName,
                 [channelName, sendChannelNotification](QString avatarLink) {
@@ -81,10 +115,32 @@ public:
     void toastActivated() const
     {
         QString link;
-        if (platform_ == Platform::Twitch) {
-            link = "http://www.twitch.tv/" + channelName_;
+        auto toastReaction =
+            static_cast<ToastReaction>(getSettings()->openFromToast.getValue());
+
+        switch (toastReaction)
+        {
+            case ToastReaction::OpenInBrowser:
+                if (platform_ == Platform::Twitch)
+                {
+                    link = "http://www.twitch.tv/" + channelName_;
+                }
+                QDesktopServices::openUrl(QUrl(link));
+                break;
+            case ToastReaction::OpenInPlayer:
+                if (platform_ == Platform::Twitch)
+                {
+                    link = "https://player.twitch.tv/?channel=" + channelName_;
+                }
+                QDesktopServices::openUrl(QUrl(link));
+                break;
+            case ToastReaction::OpenInStreamlink: {
+                openStreamlinkForChannel(channelName_);
+                break;
+            }
+                // the fourth and last option is "don't open"
+                // in this case obviously nothing should happen
         }
-        QDesktopServices::openUrl(QUrl(link));
     }
 
     void toastActivated(int actionIndex) const
@@ -109,17 +165,28 @@ void Toasts::sendWindowsNotification(const QString &channelName, Platform p)
     std::wstring widestr = std::wstring(utf8_text.begin(), utf8_text.end());
 
     templ.setTextField(widestr, WinToastLib::WinToastTemplate::FirstLine);
-    templ.setTextField(L"Click here to open in browser",
-                       WinToastLib::WinToastTemplate::SecondLine);
+    if (static_cast<ToastReaction>(getSettings()->openFromToast.getValue()) !=
+        ToastReaction::DontOpen)
+    {
+        QString mode =
+            Toasts::findStringFromReaction(getSettings()->openFromToast);
+        mode = mode.toLower();
+
+        templ.setTextField(L"Click here to " + mode.toStdWString(),
+                           WinToastLib::WinToastTemplate::SecondLine);
+    }
+
     QString Path;
-    if (p == Platform::Twitch) {
+    if (p == Platform::Twitch)
+    {
         Path = getPaths()->twitchProfileAvatars + "/twitch/" + channelName +
                ".png";
     }
     std::string temp_Utf8 = Path.toUtf8().constData();
     std::wstring imagePath = std::wstring(temp_Utf8.begin(), temp_Utf8.end());
     templ.setImagePath(imagePath);
-    if (getSettings()->notificationPlaySound) {
+    if (getSettings()->notificationPlaySound)
+    {
         templ.setAudioOption(
             WinToastLib::WinToastTemplate::AudioOption::Silent);
     }
@@ -145,44 +212,47 @@ void Toasts::fetchChannelAvatar(const QString channelName,
     QString requestUrl("https://api.twitch.tv/kraken/users?login=" +
                        channelName);
 
-    NetworkRequest request(requestUrl);
-    request.setCaller(QThread::currentThread());
-    request.makeAuthorizedV5(getDefaultClientID());
-    request.setTimeout(30000);
-    request.onSuccess([successCallback](auto result) mutable -> Outcome {
-        auto root = result.parseJson();
-        if (!root.value("users").isArray()) {
-            // log("API Error while getting user id, users is not an array");
-            successCallback("");
-            return Failure;
-        }
-        auto users = root.value("users").toArray();
-        if (users.size() != 1) {
-            // log("API Error while getting user id, users array size is not
-            // 1");
-            successCallback("");
-            return Failure;
-        }
-        if (!users[0].isObject()) {
-            // log("API Error while getting user id, first user is not an
-            // object");
-            successCallback("");
-            return Failure;
-        }
-        auto firstUser = users[0].toObject();
-        auto avatar = firstUser.value("logo");
-        if (!avatar.isString()) {
-            // log("API Error: while getting user avatar, first user object "
-            //    "`avatar` key "
-            //    "is not a "
-            //    "string");
-            successCallback("");
-            return Failure;
-        }
-        successCallback(avatar.toString());
-        return Success;
-    });
+    NetworkRequest(requestUrl)
 
-    request.execute();
+        .authorizeTwitchV5(getDefaultClientID())
+        .timeout(30000)
+        .onSuccess([successCallback](auto result) mutable -> Outcome {
+            auto root = result.parseJson();
+            if (!root.value("users").isArray())
+            {
+                // log("API Error while getting user id, users is not an array");
+                successCallback("");
+                return Failure;
+            }
+            auto users = root.value("users").toArray();
+            if (users.size() != 1)
+            {
+                // log("API Error while getting user id, users array size is not
+                // 1");
+                successCallback("");
+                return Failure;
+            }
+            if (!users[0].isObject())
+            {
+                // log("API Error while getting user id, first user is not an
+                // object");
+                successCallback("");
+                return Failure;
+            }
+            auto firstUser = users[0].toObject();
+            auto avatar = firstUser.value("logo");
+            if (!avatar.isString())
+            {
+                // log("API Error: while getting user avatar, first user object "
+                //    "`avatar` key "
+                //    "is not a "
+                //    "string");
+                successCallback("");
+                return Failure;
+            }
+            successCallback(avatar.toString());
+            return Success;
+        })
+        .execute();
 }
 }  // namespace chatterino

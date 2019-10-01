@@ -22,7 +22,7 @@ public:
     {
     }
 
-    std::size_t getLength()
+    std::size_t size() const
     {
         return this->length_;
     }
@@ -33,10 +33,12 @@ public:
 
         size_t x = 0;
 
-        for (size_t i = 0; i < this->chunks_->size(); i++) {
+        for (size_t i = 0; i < this->chunks_->size(); i++)
+        {
             auto &chunk = this->chunks_->at(i);
 
-            if (x <= index && x + chunk->size() > index) {
+            if (x <= index && x + chunk->size() > index)
+            {
                 return chunk->at(index - x);
             }
             x += chunk->size();

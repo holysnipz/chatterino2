@@ -41,6 +41,7 @@ public:
     virtual void paintAnimated(QPainter &painter, int yOffset) = 0;
     virtual int getMouseOverIndex(const QPoint &abs) const = 0;
     virtual int getXFromIndex(int index) = 0;
+
     const Link &getLink() const;
     const QString &getText() const;
     FlagsEnum<MessageElementFlag> getFlags() const;
@@ -71,8 +72,20 @@ protected:
     int getMouseOverIndex(const QPoint &abs) const override;
     int getXFromIndex(int index) override;
 
-private:
     ImagePtr image_;
+};
+
+class ImageWithBackgroundLayoutElement : public ImageLayoutElement
+{
+public:
+    ImageWithBackgroundLayoutElement(MessageElement &creator, ImagePtr image,
+                                     const QSize &size, QColor color);
+
+protected:
+    void paint(QPainter &painter) override;
+
+private:
+    QColor color_;
 };
 
 // TEXT
@@ -80,8 +93,10 @@ class TextLayoutElement : public MessageLayoutElement
 {
 public:
     TextLayoutElement(MessageElement &creator_, QString &text,
-                      const QSize &size, QColor color, FontStyle style,
-                      float scale);
+                      const QSize &size, QColor color_, FontStyle style_,
+                      float scale_);
+
+    void listenToLinkChanges();
 
 protected:
     void addCopyTextToString(QString &str, int from = 0,
@@ -93,9 +108,11 @@ protected:
     int getXFromIndex(int index) override;
 
 private:
-    QColor color;
-    FontStyle style;
-    float scale;
+    QColor color_;
+    FontStyle style_;
+    float scale_;
+
+    std::vector<pajlada::Signals::ScopedConnection> managedConnections_;
 };
 
 // TEXT ICON

@@ -2,7 +2,7 @@
 
 #include "providers/twitch/PubsubActions.hpp"
 #include "providers/twitch/TwitchAccount.hpp"
-#include "providers/twitch/TwitchServer.hpp"
+#include "providers/twitch/TwitchIrcServer.hpp"
 
 #include <rapidjson/document.h>
 #include <QString>
@@ -112,6 +112,9 @@ public:
 
             Signal<BanAction> userBanned;
             Signal<UnbanAction> userUnbanned;
+
+            Signal<AutomodAction> automodMessage;
+            Signal<AutomodUserAction> automodUserMessage;
         } moderation;
 
         struct {

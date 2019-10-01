@@ -8,15 +8,54 @@
 
 #include "singletons/Settings.hpp"
 
+#define SETTINGS_PAGE_WIDGET_BOILERPLATE(type, parent) \
+    class type : public parent                         \
+    {                                                  \
+        using parent::parent;                          \
+                                                       \
+    public:                                            \
+        bool greyedOut{};                              \
+                                                       \
+    protected:                                         \
+        void paintEvent(QPaintEvent *e) override       \
+        {                                              \
+            parent::paintEvent(e);                     \
+                                                       \
+            if (this->greyedOut)                       \
+            {                                          \
+                QPainter painter(this);                \
+                QColor color = QColor("#222222");      \
+                color.setAlphaF(0.7);                  \
+                painter.fillRect(this->rect(), color); \
+            }                                          \
+        }                                              \
+    };
+
 namespace chatterino {
 
-class SettingsPage : public QWidget
+// S* widgets are the same as their Q* counterparts,
+// but they can be greyed out and will be if you search.
+SETTINGS_PAGE_WIDGET_BOILERPLATE(SCheckBox, QCheckBox)
+SETTINGS_PAGE_WIDGET_BOILERPLATE(SLabel, QLabel)
+SETTINGS_PAGE_WIDGET_BOILERPLATE(SComboBox, QComboBox)
+SETTINGS_PAGE_WIDGET_BOILERPLATE(SPushButton, QPushButton)
+
+class SettingsDialogTab;
+
+class SettingsPage : public QFrame
 {
+    Q_OBJECT
+
 public:
     SettingsPage(const QString &name, const QString &iconResource);
 
     const QString &getName();
     const QString &getIconResource();
+
+    virtual bool filterElements(const QString &query);
+
+    SettingsDialogTab *tab() const;
+    void setTab(SettingsDialogTab *tab);
 
     void cancel();
 
@@ -35,6 +74,8 @@ public:
 protected:
     QString name_;
     QString iconResource_;
+
+    SettingsDialogTab *tab_;
 
     pajlada::Signals::NoArgSignal onCancel_;
     std::vector<pajlada::Signals::ScopedConnection> managedConnections_;

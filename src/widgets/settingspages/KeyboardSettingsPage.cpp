@@ -13,7 +13,7 @@ KeyboardSettingsPage::KeyboardSettingsPage()
     auto layout =
         LayoutCreator<KeyboardSettingsPage>(this).setLayoutType<QVBoxLayout>();
 
-    auto form = layout.emplace<QFormLayout>();
+    auto form = layout.emplace<QFormLayout>().withoutMargin();
 
     form->addRow(new QLabel("Hold Ctrl"), new QLabel("Show resize handles"));
     form->addRow(new QLabel("Hold Ctrl + Alt"),
@@ -43,6 +43,8 @@ KeyboardSettingsPage::KeyboardSettingsPage()
                  new QLabel("Search in current channel"));
     form->addRow(new QLabel("Ctrl + E"), new QLabel("Open Emote menu"));
     form->addRow(new QLabel("Ctrl + P"), new QLabel("Open Settings menu"));
+    form->addRow(new QLabel("F5"),
+                 new QLabel("Reload subscriber and channel emotes"));
 }
 
 }  // namespace chatterino

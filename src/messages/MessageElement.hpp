@@ -17,6 +17,7 @@
 namespace chatterino {
 class Channel;
 struct MessageLayoutContainer;
+class MessageLayoutElement;
 
 class Image;
 using ImagePtr = std::shared_ptr<Image>;
@@ -42,6 +43,7 @@ enum class MessageElementFlag {
     FfzEmoteText = (1 << 11),
     FfzEmote = FfzEmoteImage | FfzEmoteText,
     EmoteImages = TwitchEmoteImage | BttvEmoteImage | FfzEmoteImage,
+    EmoteText = TwitchEmoteText | BttvEmoteText | FfzEmoteText,
 
     BitsStatic = (1 << 12),
     BitsAnimated = (1 << 13),
@@ -73,9 +75,6 @@ enum class MessageElementFlag {
     // - Chatterino donator badge
     // - Chatterino top donator badge
     BadgeChatterino = (1 << 18),
-
-    // Rest of slots: ffz custom badge? bttv custom badge? mywaifu (puke)
-    // custom badge?
 
     Badges = BadgeGlobalAuthority | BadgeChannelAuthority | BadgeSubscription |
              BadgeVanity | BadgeChatterino,
@@ -135,16 +134,32 @@ public:
     virtual void addToContainer(MessageLayoutContainer &container,
                                 MessageElementFlags flags) = 0;
 
+    pajlada::Signals::NoArgSignal linkChanged;
+
 protected:
     MessageElement(MessageElementFlags flags);
     bool trailingSpace = true;
-    pajlada::Signals::NoArgSignal linkChanged;
 
 private:
     QString text_;
     Link link_;
     QString tooltip_;
     MessageElementFlags flags_;
+};
+
+// used when layout element doesn't have a creator
+class EmptyElement : public MessageElement
+{
+public:
+    EmptyElement();
+
+    void addToContainer(MessageLayoutContainer &container,
+                        MessageElementFlags flags) override;
+
+    static EmptyElement &instance();
+
+private:
+    ImagePtr image_;
 };
 
 // contains a simple image
@@ -195,8 +210,37 @@ public:
                         MessageElementFlags flags_) override;
     EmotePtr getEmote() const;
 
+protected:
+    virtual MessageLayoutElement *makeImageLayoutElement(const ImagePtr &image,
+                                                         const QSize &size);
+
 private:
     std::unique_ptr<TextElement> textElement_;
+    EmotePtr emote_;
+};
+
+// Behaves like an emote element, except it creates a different image layout element that draws the mod badge background
+class ModBadgeElement : public EmoteElement
+{
+public:
+    ModBadgeElement(const EmotePtr &data, MessageElementFlags flags_);
+
+protected:
+    MessageLayoutElement *makeImageLayoutElement(const ImagePtr &image,
+                                                 const QSize &size) override;
+};
+
+class BadgeElement : public MessageElement
+{
+public:
+    BadgeElement(const EmotePtr &data, MessageElementFlags flags_);
+
+    void addToContainer(MessageLayoutContainer &container,
+                        MessageElementFlags flags_) override;
+
+    EmotePtr getEmote() const;
+
+private:
     EmotePtr emote_;
 };
 

@@ -9,9 +9,11 @@ IrcConnection::IrcConnection(QObject *parent)
     this->pingTimer_.setInterval(5000);
     this->pingTimer_.start();
     QObject::connect(&this->pingTimer_, &QTimer::timeout, [this] {
-        if (this->isConnected()) {
-            if (!this->recentlyReceivedMessage_.load()) {
-                this->sendRaw("PING");
+        if (this->isConnected())
+        {
+            if (!this->recentlyReceivedMessage_.load())
+            {
+                this->sendRaw("PING chatterino/ping");
                 this->reconnectTimer_.start();
             }
             this->recentlyReceivedMessage_ = false;
@@ -22,7 +24,8 @@ IrcConnection::IrcConnection(QObject *parent)
     this->reconnectTimer_.setInterval(5000);
     this->reconnectTimer_.setSingleShot(true);
     QObject::connect(&this->reconnectTimer_, &QTimer::timeout, [this] {
-        if (this->isConnected()) {
+        if (this->isConnected())
+        {
             reconnectRequested.invoke();
         }
     });
@@ -31,7 +34,8 @@ IrcConnection::IrcConnection(QObject *parent)
                      [this](Communi::IrcMessage *) {
                          this->recentlyReceivedMessage_ = true;
 
-                         if (this->reconnectTimer_.isActive()) {
+                         if (this->reconnectTimer_.isActive())
+                         {
                              this->reconnectTimer_.stop();
                          }
                      });

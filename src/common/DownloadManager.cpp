@@ -20,9 +20,7 @@ DownloadManager::~DownloadManager()
 
 void DownloadManager::setFile(QString fileURL, const QString &channelName)
 {
-    QString filePath = fileURL;
     QString saveFilePath;
-    QStringList filePathList = filePath.split('/');
     saveFilePath =
         getPaths()->twitchProfileAvatars + "/twitch/" + channelName + ".png";
     QNetworkRequest request;
@@ -48,16 +46,19 @@ void DownloadManager::onDownloadProgress(qint64 bytesRead, qint64 bytesTotal)
 
 void DownloadManager::onFinished(QNetworkReply *reply)
 {
-    switch (reply->error()) {
+    switch (reply->error())
+    {
         case QNetworkReply::NoError: {
             qDebug("file is downloaded successfully.");
-        } break;
+        }
+        break;
         default: {
             qDebug() << reply->errorString().toLatin1();
         };
     }
 
-    if (file->isOpen()) {
+    if (file->isOpen())
+    {
         file->close();
         file->deleteLater();
     }
@@ -71,7 +72,8 @@ void DownloadManager::onReadyRead()
 
 void DownloadManager::onReplyFinished()
 {
-    if (file->isOpen()) {
+    if (file->isOpen())
+    {
         file->close();
         file->deleteLater();
     }

@@ -1,31 +1,28 @@
 #pragma once
 
-#include "Paths.hpp"
-
-#include "common/ChatterinoSetting.hpp"
-#include "controllers/highlights/HighlightPhrase.hpp"
-#include "controllers/moderationactions/ModerationAction.hpp"
-
 #include <pajlada/settings/setting.hpp>
 #include <pajlada/settings/settinglistener.hpp>
 
+#include "BaseSettings.hpp"
+#include "common/Channel.hpp"
+#include "controllers/highlights/HighlightPhrase.hpp"
+#include "controllers/moderationactions/ModerationAction.hpp"
+#include "singletons/Toasts.hpp"
+
 namespace chatterino {
 
-void _actuallyRegisterSetting(
-    std::weak_ptr<pajlada::Settings::ISettingData> setting);
-
-class Settings
+class Settings : public ABSettings
 {
     static Settings *instance;
 
 public:
-    Settings(Paths &paths);
+    Settings(const QString &settingsDirectory);
 
     static Settings &getInstance();
 
     /// Appearance
     BoolSetting showTimestamps = {"/appearance/messages/showTimestamps", true};
-    BoolSetting enableAnimationsWhenFocused = {
+    BoolSetting animationsWhenFocused = {
         "/appearance/enableAnimationsWhenFocused", false};
     QStringSetting timestampFormat = {"/appearance/messages/timestampFormat",
                                       "h:mm"};
@@ -40,31 +37,38 @@ public:
                                      false};
     BoolSetting separateMessages = {"/appearance/messages/separateMessages",
                                     false};
+    BoolSetting compactEmotes = {"/appearance/messages/compactEmotes", true};
+    BoolSetting hideModerated = {"/appearance/messages/hideModerated", false};
+    BoolSetting hideModerationActions = {
+        "/appearance/messages/hideModerationActions", false};
+    BoolSetting colorizeNicknames = {"/appearance/messages/colorizeNicknames",
+                                     false};
+
     //    BoolSetting collapseLongMessages =
     //    {"/appearance/messages/collapseLongMessages", false};
     IntSetting collpseMessagesMinLines = {
         "/appearance/messages/collapseMessagesMinLines", 0};
-    BoolSetting alternateMessageBackground = {
+    BoolSetting alternateMessages = {
         "/appearance/messages/alternateMessageBackground", false};
-    IntSetting uiScale = {"/appearance/uiScale", 0};
-    IntSetting boldScale = {"/appearance/boldScale", 57};
-    BoolSetting windowTopMost = {"/appearance/windowAlwaysOnTop", false};
+    FloatSetting boldScale = {"/appearance/boldScale", 63};
     BoolSetting showTabCloseButton = {"/appearance/showTabCloseButton", true};
+    BoolSetting showTabLive = {"/appearance/showTabLiveButton", false};
     BoolSetting hidePreferencesButton = {"/appearance/hidePreferencesButton",
                                          false};
     BoolSetting hideUserButton = {"/appearance/hideUserButton", false};
     BoolSetting enableSmoothScrolling = {"/appearance/smoothScrolling", true};
     BoolSetting enableSmoothScrollingNewMessages = {
         "/appearance/smoothScrollingNewMessages", false};
-    BoolSetting enableUsernameBold = {"/appearance/messages/boldUsernames",
-                                      false};
+    BoolSetting boldUsernames = {"/appearance/messages/boldUsernames", false};
     // BoolSetting customizable splitheader
-    BoolSetting showViewerCount = {"/appearance/splitheader/showViewerCount",
-                                   false};
-    BoolSetting showTitle = {"/appearance/splitheader/showTitle", false};
-    BoolSetting showGame = {"/appearance/splitheader/showGame", false};
-    BoolSetting showUptime = {"/appearance/splitheader/showUptime", false};
-
+    BoolSetting headerViewerCount = {"/appearance/splitheader/showViewerCount",
+                                     false};
+    BoolSetting headerStreamTitle = {"/appearance/splitheader/showTitle",
+                                     false};
+    BoolSetting headerGame = {"/appearance/splitheader/showGame", false};
+    BoolSetting headerUptime = {"/appearance/splitheader/showUptime", false};
+    FloatSetting customThemeMultiplier = {"/appearance/customThemeMultiplier",
+                                          -0.5f};
     // BoolSetting useCustomWindowFrame = {"/appearance/useCustomWindowFrame",
     // false};
 
@@ -94,8 +98,15 @@ public:
         "/behaviour/autocompletion/onlyFetchChattersForSmallerStreamers", true};
     IntSetting smallStreamerLimit = {
         "/behaviour/autocompletion/smallStreamerLimit", 1000};
+    BoolSetting prefixOnlyEmoteCompletion = {
+        "/behaviour/autocompletion/prefixOnlyCompletion", true};
 
-    BoolSetting pauseChatHover = {"/behaviour/pauseChatHover", false};
+    FloatSetting pauseOnHoverDuration = {"/behaviour/pauseOnHoverDuration", 0};
+    EnumSetting<Qt::KeyboardModifier> pauseChatModifier = {
+        "/behaviour/pauseChatModifier", Qt::KeyboardModifier::NoModifier};
+    BoolSetting autorun = {"/behaviour/autorun", false};
+    BoolSetting mentionUsersWithComma = {"/behaviour/mentionUsersWithComma",
+                                         true};
 
     /// Commands
     BoolSetting allowCommandsAtEnd = {"/commands/allowCommandsAtEnd", false};
@@ -103,20 +114,17 @@ public:
     /// Emotes
     BoolSetting scaleEmotesByLineHeight = {"/emotes/scaleEmotesByLineHeight",
                                            false};
-    BoolSetting enableTwitchEmotes = {"/emotes/enableTwitchEmotes", true};
-    BoolSetting enableBttvEmotes = {"/emotes/enableBTTVEmotes", true};
-    BoolSetting enableFfzEmotes = {"/emotes/enableFFZEmotes", true};
-    BoolSetting enableEmojis = {"/emotes/enableEmojis", true};
-    BoolSetting enableGifAnimations = {"/emotes/enableGifAnimations", true};
+    BoolSetting enableEmoteImages = {"/emotes/enableEmoteImages", true};
+    BoolSetting animateEmotes = {"/emotes/enableGifAnimations", true};
     FloatSetting emoteScale = {"/emotes/scale", 1.f};
 
     QStringSetting emojiSet = {"/emotes/emojiSet", "EmojiOne 2"};
 
     /// Links
     BoolSetting linksDoubleClickOnly = {"/links/doubleClickToOpen", false};
-    BoolSetting enableLinkInfoTooltip = {"/links/linkInfoTooltip", false};
-    BoolSetting enableUnshortLinks = {"/links/unshortLinks", false};
-    BoolSetting enableLowercaseLink = {"/links/linkLowercase", true};
+    BoolSetting linkInfoTooltip = {"/links/linkInfoTooltip", false};
+    BoolSetting unshortLinks = {"/links/unshortLinks", false};
+    BoolSetting lowercaseDomains = {"/links/linkLowercase", true};
 
     /// Ignored phrases
     QStringSetting ignoredPhraseReplace = {"/ignore/ignoredPhraseReplace",
@@ -125,9 +133,13 @@ public:
     /// Ingored Users
     BoolSetting enableTwitchIgnoredUsers = {"/ignore/enableTwitchIgnoredUsers",
                                             true};
+    IntSetting showIgnoredUsersMessages = {"/ignore/showIgnoredUsers", 0};
 
     /// Moderation
     QStringSetting timeoutAction = {"/moderation/timeoutAction", "Disable"};
+    IntSetting timeoutStackStyle = {
+        "/moderation/timeoutStackStyle",
+        static_cast<int>(TimeoutStackStyle::Default)};
 
     /// Highlighting
     //    BoolSetting enableHighlights = {"/highlighting/enabled", true};
@@ -144,7 +156,7 @@ public:
         "/highlighting/whisperHighlight/enableSound", false};
     BoolSetting enableWhisperHighlightTaskbar = {
         "/highlighting/whisperHighlight/enableTaskbarFlashing", false};
-    QStringSetting highlightColor = {"/highlighting/color", "#4B282C"};
+    QStringSetting highlightColor = {"/highlighting/color", ""};
 
     BoolSetting longAlerts = {"/highlighting/alerts", false};
 
@@ -160,6 +172,8 @@ public:
                                             false};
 
     BoolSetting inlineWhispers = {"/whispers/enableInlineWhispers", true};
+    BoolSetting highlightInlineWhispers = {"/whispers/highlightInlineWhispers",
+                                           false};
 
     /// Notifications
     BoolSetting notificationFlashTaskbar = {"/notifications/enableFlashTaskbar",
@@ -172,6 +186,8 @@ public:
                                             "qrc:/sounds/ping3.wav"};
 
     BoolSetting notificationToast = {"/notifications/enableToast", false};
+    IntSetting openFromToast = {"/notifications/openFromToast",
+                                static_cast<int>(ToastReaction::OpenInBrowser)};
 
     /// External tools
     // Streamlink
@@ -183,20 +199,37 @@ public:
     QStringSetting streamlinkOpts = {"/external/streamlink/options", ""};
 
     /// Misc
+    BoolSetting betaUpdates = {"/misc/beta", false};
+#ifdef Q_OS_LINUX
+    BoolSetting useKeyring = {"/misc/useKeyring", true};
+#endif
+    BoolSetting enableExperimentalIrc = {"/misc/experimentalIrc", false};
+
     IntSetting startUpNotification = {"/misc/startUpNotification", 0};
     QStringSetting currentVersion = {"/misc/currentVersion", ""};
+    BoolSetting loadTwitchMessageHistoryOnConnect = {
+        "/misc/twitch/loadMessageHistoryOnConnect", true};
+    IntSetting emotesTooltipPreview = {"/misc/emotesTooltipPreview", 0};
+    BoolSetting openLinksIncognito = {"/misc/openLinksIncognito", 0};
 
     QStringSetting cachePath = {"/cache/path", ""};
+    BoolSetting restartOnCrash = {"/misc/restartOnCrash", true};
 
-    void saveSnapshot();
-    void restoreSnapshot();
+    /// Debug
+    BoolSetting showUnhandledIrcMessages = {"/debug/showUnhandledIrcMessages",
+                                            false};
+
+    /// UI
+    // Purely QOL settings are here (like last item in a list).
+    IntSetting lastSelectChannelTab = {"/ui/lastSelectChannelTab", 0};
+    IntSetting lastSelectIrcConn = {"/ui/lastSelectIrcConn", 0};
 
 private:
     void updateModerationActions();
-
-    std::unique_ptr<rapidjson::Document> snapshot_;
 };
 
-Settings *getSettings();
-
 }  // namespace chatterino
+
+#ifdef CHATTERINO
+#    include "singletons/Settings.hpp"
+#endif

@@ -44,7 +44,8 @@ struct ModeChangedAction : PubSubAction {
 
     const char *getModeName() const
     {
-        switch (this->mode) {
+        switch (this->mode)
+        {
             case Mode::Slow:
                 return "slow";
             case Mode::R9K:
@@ -102,6 +103,34 @@ struct ModerationStateAction : PubSubAction {
     // true = modded
     // false = unmodded
     bool modded;
+};
+
+struct AutomodAction : PubSubAction {
+    using PubSubAction::PubSubAction;
+
+    ActionUser target;
+
+    QString message;
+
+    QString reason;
+
+    QString msgID;
+};
+
+struct AutomodUserAction : PubSubAction {
+    using PubSubAction::PubSubAction;
+
+    ActionUser target;
+
+    enum {
+        AddPermitted,
+        RemovePermitted,
+        AddBlocked,
+        RemoveBlocked,
+        Properties,
+    } type;
+
+    QString message;
 };
 
 }  // namespace chatterino

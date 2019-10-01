@@ -30,7 +30,7 @@ struct SelectionItem {
 
     bool operator>(const SelectionItem &b) const
     {
-        return b.operator<(*this);
+        return !this->operator==(b) && b.operator<(*this);
     }
 
     bool operator==(const SelectionItem &b) const
@@ -59,7 +59,8 @@ struct Selection {
         , selectionMin(start)
         , selectionMax(end)
     {
-        if (selectionMin > selectionMax) {
+        if (selectionMin > selectionMax)
+        {
             std::swap(this->selectionMin, this->selectionMax);
         }
     }

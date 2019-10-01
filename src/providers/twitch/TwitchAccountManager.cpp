@@ -15,13 +15,15 @@ TwitchAccountManager::TwitchAccountManager()
         currentUser->loadIgnores();
     });
 
-    this->accounts.itemRemoved.connect(
-        [this](const auto &acc) { this->removeUser(acc.item.get()); });
+    this->accounts.itemRemoved.connect([this](const auto &acc) {  //
+        this->removeUser(acc.item.get());
+    });
 }
 
 std::shared_ptr<TwitchAccount> TwitchAccountManager::getCurrent()
 {
-    if (!this->currentUser_) {
+    if (!this->currentUser_)
+    {
         return this->anonymousUser_;
     }
 
@@ -34,7 +36,8 @@ std::vector<QString> TwitchAccountManager::getUsernames() const
 
     std::lock_guard<std::mutex> lock(this->mutex_);
 
-    for (const auto &user : this->accounts.getVector()) {
+    for (const auto &user : this->accounts)
+    {
         userNames.push_back(user->getUserName());
     }
 
@@ -46,8 +49,10 @@ std::shared_ptr<TwitchAccount> TwitchAccountManager::findUserByUsername(
 {
     std::lock_guard<std::mutex> lock(this->mutex_);
 
-    for (const auto &user : this->accounts.getVector()) {
-        if (username.compare(user->getUserName(), Qt::CaseInsensitive) == 0) {
+    for (const auto &user : this->accounts)
+    {
+        if (username.compare(user->getUserName(), Qt::CaseInsensitive) == 0)
+        {
             return user;
         }
     }
@@ -68,52 +73,61 @@ void TwitchAccountManager::reloadUsers()
 
     bool listUpdated = false;
 
-    for (const auto &uid : keys) {
-        if (uid == "current") {
+    for (const auto &uid : keys)
+    {
+        if (uid == "current")
+        {
             continue;
         }
 
-        std::string username = pajlada::Settings::Setting<std::string>::get(
+        auto username = pajlada::Settings::Setting<QString>::get(
             "/accounts/" + uid + "/username");
-        std::string userID = pajlada::Settings::Setting<std::string>::get(
-            "/accounts/" + uid + "/userID");
-        std::string clientID = pajlada::Settings::Setting<std::string>::get(
+        auto userID = pajlada::Settings::Setting<QString>::get("/accounts/" +
+                                                               uid + "/userID");
+        auto clientID = pajlada::Settings::Setting<QString>::get(
             "/accounts/" + uid + "/clientID");
-        std::string oauthToken = pajlada::Settings::Setting<std::string>::get(
+        auto oauthToken = pajlada::Settings::Setting<QString>::get(
             "/accounts/" + uid + "/oauthToken");
 
-        if (username.empty() || userID.empty() || clientID.empty() ||
-            oauthToken.empty()) {
+        if (username.isEmpty() || userID.isEmpty() || clientID.isEmpty() ||
+            oauthToken.isEmpty())
+        {
             continue;
         }
 
-        userData.username = qS(username).trimmed();
-        userData.userID = qS(userID).trimmed();
-        userData.clientID = qS(clientID).trimmed();
-        userData.oauthToken = qS(oauthToken).trimmed();
+        userData.username = username.trimmed();
+        userData.userID = userID.trimmed();
+        userData.clientID = clientID.trimmed();
+        userData.oauthToken = oauthToken.trimmed();
 
-        switch (this->addUser(userData)) {
+        switch (this->addUser(userData))
+        {
             case AddUserResponse::UserAlreadyExists: {
                 log("User {} already exists", userData.username);
                 // Do nothing
-            } break;
+            }
+            break;
             case AddUserResponse::UserValuesUpdated: {
                 log("User {} already exists, and values updated!",
                     userData.username);
-                if (userData.username == this->getCurrent()->getUserName()) {
+                if (userData.username == this->getCurrent()->getUserName())
+                {
                     log("It was the current user, so we need to reconnect "
                         "stuff!");
                     this->currentUserChanged.invoke();
                 }
-            } break;
+            }
+            break;
             case AddUserResponse::UserAdded: {
                 log("Added user {}", userData.username);
                 listUpdated = true;
-            } break;
+            }
+            break;
         }
     }
 
-    if (listUpdated) {
+    if (listUpdated)
+    {
         this->userListUpdated.invoke();
     }
 }
@@ -122,15 +136,17 @@ void TwitchAccountManager::load()
 {
     this->reloadUsers();
 
-    this->currentUsername.connect([this](const auto &newValue, auto) {
-        QString newUsername(QString::fromStdString(newValue));
+    this->currentUsername.connect([this](const QString &newUsername) {
         auto user = this->findUserByUsername(newUsername);
-        if (user) {
+        if (user)
+        {
             log("[AccountManager:currentUsernameChanged] User successfully "
                 "updated to {}",
                 newUsername);
             this->currentUser_ = user;
-        } else {
+        }
+        else
+        {
             log("[AccountManager:currentUsernameChanged] User successfully "
                 "updated to anonymous");
             this->currentUser_ = this->anonymousUser_;
@@ -142,7 +158,8 @@ void TwitchAccountManager::load()
 
 bool TwitchAccountManager::isLoggedIn() const
 {
-    if (!this->currentUser_) {
+    if (!this->currentUser_)
+    {
         return false;
     }
 
@@ -153,15 +170,15 @@ bool TwitchAccountManager::isLoggedIn() const
 
 bool TwitchAccountManager::removeUser(TwitchAccount *account)
 {
-    const auto &accs = this->accounts.getVector();
-
-    std::string userID(account->getUserId().toStdString());
-    if (!userID.empty()) {
-        pajlada::Settings::SettingManager::removeSetting("/accounts/uid" +
-                                                         userID);
+    auto userID(account->getUserId());
+    if (!userID.isEmpty())
+    {
+        pajlada::Settings::SettingManager::removeSetting(
+            fS("/accounts/uid{}", userID));
     }
 
-    if (account->getUserName() == qS(this->currentUsername.getValue())) {
+    if (account->getUserName() == this->currentUsername)
+    {
         // The user that was removed is the current user, log into the anonymous
         // user
         this->currentUsername = "";
@@ -176,20 +193,26 @@ TwitchAccountManager::AddUserResponse TwitchAccountManager::addUser(
     const TwitchAccountManager::UserData &userData)
 {
     auto previousUser = this->findUserByUsername(userData.username);
-    if (previousUser) {
+    if (previousUser)
+    {
         bool userUpdated = false;
 
-        if (previousUser->setOAuthClient(userData.clientID)) {
+        if (previousUser->setOAuthClient(userData.clientID))
+        {
             userUpdated = true;
         }
 
-        if (previousUser->setOAuthToken(userData.oauthToken)) {
+        if (previousUser->setOAuthToken(userData.oauthToken))
+        {
             userUpdated = true;
         }
 
-        if (userUpdated) {
+        if (userUpdated)
+        {
             return AddUserResponse::UserValuesUpdated;
-        } else {
+        }
+        else
+        {
             return AddUserResponse::UserAlreadyExists;
         }
     }

@@ -17,7 +17,8 @@ void HighlightController::initialize(Settings &settings, Paths &paths)
     assert(!this->initialized_);
     this->initialized_ = true;
 
-    for (const HighlightPhrase &phrase : this->highlightsSetting_.getValue()) {
+    for (const HighlightPhrase &phrase : this->highlightsSetting_.getValue())
+    {
         this->phrases.appendItem(phrase);
     }
 
@@ -26,12 +27,22 @@ void HighlightController::initialize(Settings &settings, Paths &paths)
     });
 
     for (const HighlightBlacklistUser &blacklistedUser :
-         this->blacklistSetting_.getValue()) {
+         this->blacklistSetting_.getValue())
+    {
         this->blacklistedUsers.appendItem(blacklistedUser);
     }
 
     this->blacklistedUsers.delayedItemsChanged.connect([this] {
         this->blacklistSetting_.setValue(this->blacklistedUsers.getVector());
+    });
+
+    for (const HighlightPhrase &user : this->userSetting_.getValue())
+    {
+        this->highlightedUsers.appendItem(user);
+    }
+
+    this->highlightedUsers.delayedItemsChanged.connect([this] {  //
+        this->userSetting_.setValue(this->highlightedUsers.getVector());
     });
 }
 
@@ -53,9 +64,11 @@ UserHighlightModel *HighlightController::createUserModel(QObject *parent)
 
 bool HighlightController::isHighlightedUser(const QString &username)
 {
-    const auto &userItems = this->highlightedUsers.getVector();
-    for (const auto &highlightedUser : userItems) {
-        if (highlightedUser.isMatch(username)) {
+    const auto &userItems = this->highlightedUsers;
+    for (const auto &highlightedUser : userItems)
+    {
+        if (highlightedUser.isMatch(username))
+        {
             return true;
         }
     }
@@ -74,10 +87,10 @@ HighlightBlacklistModel *HighlightController::createBlacklistModel(
 
 bool HighlightController::blacklistContains(const QString &username)
 {
-    std::vector<HighlightBlacklistUser> blacklistItems =
-        this->blacklistedUsers.getVector();
-    for (const auto &blacklistedUser : blacklistItems) {
-        if (blacklistedUser.isMatch(username)) {
+    for (const auto &blacklistedUser : this->blacklistedUsers)
+    {
+        if (blacklistedUser.isMatch(username))
+        {
             return true;
         }
     }

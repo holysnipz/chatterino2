@@ -6,11 +6,11 @@
 #include "singletons/Theme.hpp"
 #include "singletons/WindowManager.hpp"
 #include "util/InitUpdateButton.hpp"
+#include "util/Shortcut.hpp"
 #include "widgets/Window.hpp"
 #include "widgets/dialogs/SettingsDialog.hpp"
 #include "widgets/helper/NotebookButton.hpp"
 #include "widgets/helper/NotebookTab.hpp"
-#include "widgets/helper/Shortcut.hpp"
 #include "widgets/splits/Split.hpp"
 #include "widgets/splits/SplitContainer.hpp"
 
@@ -34,14 +34,6 @@ Notebook::Notebook(QWidget *parent)
     this->addButton_->setIcon(NotebookButton::Icon::Plus);
 
     this->addButton_->setHidden(true);
-
-    auto *shortcut_next = new QShortcut(QKeySequence("Ctrl+Tab"), this);
-    QObject::connect(shortcut_next, &QShortcut::activated,
-                     [this] { this->selectNextTab(); });
-
-    auto *shortcut_prev = new QShortcut(QKeySequence("Ctrl+Shift+Tab"), this);
-    QObject::connect(shortcut_prev, &QShortcut::activated,
-                     [this] { this->selectPreviousTab(); });
 }
 
 NotebookTab *Notebook::addPage(QWidget *page, QString title, bool select)
@@ -63,7 +55,8 @@ NotebookTab *Notebook::addPage(QWidget *page, QString title, bool select)
     page->hide();
     page->setParent(this);
 
-    if (select || this->items_.count() == 1) {
+    if (select || this->items_.count() == 1)
+    {
         this->select(page);
     }
 
@@ -79,13 +72,20 @@ void Notebook::removePage(QWidget *page)
     // Queue up save because: Tab removed
     getApp()->windows->queueSave();
 
-    for (int i = 0; i < this->items_.count(); i++) {
-        if (this->items_[i].page == page) {
-            if (this->items_.count() == 1) {
+    for (int i = 0; i < this->items_.count(); i++)
+    {
+        if (this->items_[i].page == page)
+        {
+            if (this->items_.count() == 1)
+            {
                 this->select(nullptr);
-            } else if (i == this->items_.count() - 1) {
+            }
+            else if (i == this->items_.count() - 1)
+            {
                 this->select(this->items_[i - 1].page);
-            } else {
+            }
+            else
+            {
                 this->select(this->items_[i + 1].page);
             }
 
@@ -106,15 +106,18 @@ void Notebook::removePage(QWidget *page)
 
 void Notebook::removeCurrentPage()
 {
-    if (this->selectedPage_ != nullptr) {
+    if (this->selectedPage_ != nullptr)
+    {
         this->removePage(this->selectedPage_);
     }
 }
 
 int Notebook::indexOf(QWidget *page) const
 {
-    for (int i = 0; i < this->items_.count(); i++) {
-        if (this->items_[i].page == page) {
+    for (int i = 0; i < this->items_.count(); i++)
+    {
+        if (this->items_[i].page == page)
+        {
             return i;
         }
     }
@@ -124,11 +127,13 @@ int Notebook::indexOf(QWidget *page) const
 
 void Notebook::select(QWidget *page)
 {
-    if (page == this->selectedPage_) {
+    if (page == this->selectedPage_)
+    {
         return;
     }
 
-    if (page != nullptr) {
+    if (page != nullptr)
+    {
         page->setHidden(false);
 
         assert(this->containsPage(page));
@@ -137,20 +142,27 @@ void Notebook::select(QWidget *page)
         item.tab->setSelected(true);
         item.tab->raise();
 
-        if (item.selectedWidget == nullptr) {
+        if (item.selectedWidget == nullptr)
+        {
             item.page->setFocus();
-        } else {
-            if (containsChild(page, item.selectedWidget)) {
+        }
+        else
+        {
+            if (containsChild(page, item.selectedWidget))
+            {
                 qDebug() << item.selectedWidget;
                 item.selectedWidget->setFocus(Qt::MouseFocusReason);
-            } else {
+            }
+            else
+            {
                 qDebug()
                     << "Notebook: selected child of page doesn't exist anymore";
             }
         }
     }
 
-    if (this->selectedPage_ != nullptr) {
+    if (this->selectedPage_ != nullptr)
+    {
         this->selectedPage_->setHidden(true);
 
         Item &item = this->findItem(selectedPage_);
@@ -187,7 +199,8 @@ bool Notebook::containsChild(const QObject *obj, const QObject *child)
 {
     return std::any_of(obj->children().begin(), obj->children().end(),
                        [child](const QObject *o) {
-                           if (o == child) {
+                           if (o == child)
+                           {
                                return true;
                            }
 
@@ -197,7 +210,8 @@ bool Notebook::containsChild(const QObject *obj, const QObject *child)
 
 void Notebook::selectIndex(int index)
 {
-    if (index < 0 || this->items_.count() <= index) {
+    if (index < 0 || this->items_.count() <= index)
+    {
         return;
     }
 
@@ -206,28 +220,43 @@ void Notebook::selectIndex(int index)
 
 void Notebook::selectNextTab()
 {
-    if (this->items_.size() <= 1) {
+    if (this->items_.size() <= 1)
+    {
         return;
     }
 
-    int index = (this->indexOf(this->selectedPage_) + 1) % this->items_.count();
+    auto index =
+        (this->indexOf(this->selectedPage_) + 1) % this->items_.count();
 
     this->select(this->items_[index].page);
 }
 
 void Notebook::selectPreviousTab()
 {
-    if (this->items_.size() <= 1) {
+    if (this->items_.size() <= 1)
+    {
         return;
     }
 
     int index = this->indexOf(this->selectedPage_) - 1;
 
-    if (index < 0) {
+    if (index < 0)
+    {
         index += this->items_.count();
     }
 
     this->select(this->items_[index].page);
+}
+
+void Notebook::selectLastTab()
+{
+    const auto size = this->items_.size();
+    if (size <= 1)
+    {
+        return;
+    }
+
+    this->select(this->items_[size - 1].page);
 }
 
 int Notebook::getPageCount() const
@@ -252,15 +281,17 @@ QWidget *Notebook::getSelectedPage() const
 
 QWidget *Notebook::tabAt(QPoint point, int &index, int maxWidth)
 {
-    int i = 0;
+    auto i = 0;
 
-    for (auto &item : this->items_) {
-        QRect rect = item.tab->getDesiredRect();
-        rect.setHeight((int)(this->getScale() * 24));
+    for (auto &item : this->items_)
+    {
+        auto rect = item.tab->getDesiredRect();
+        rect.setHeight(int(this->scale() * 24));
 
         rect.setWidth(std::min(maxWidth, rect.width()));
 
-        if (rect.contains(point)) {
+        if (rect.contains(point))
+        {
             index = i;
             return item.page;
         }
@@ -306,11 +337,12 @@ void Notebook::setShowAddButton(bool value)
 
 void Notebook::scaleChangedEvent(float scale)
 {
-    float h = NOTEBOOK_TAB_HEIGHT * this->getScale();
+    float h = (NOTEBOOK_TAB_HEIGHT - 1) * this->scale();
 
     this->addButton_->setFixedSize(h, h);
 
-    for (auto &i : this->items_) {
+    for (auto &i : this->items_)
+    {
         i.tab->updateSize();
     }
 }
@@ -322,67 +354,93 @@ void Notebook::resizeEvent(QResizeEvent *)
 
 void Notebook::performLayout(bool animated)
 {
-    int xStart = int(2 * this->getScale());
+    const auto left = int(2 * this->scale());
+    const auto scale = this->scale();
+    const auto tabHeight = int(NOTEBOOK_TAB_HEIGHT * scale);
+    const auto addButtonWidth = this->showAddButton_ ? tabHeight : 0;
 
-    int x = xStart, y = 0;
-    float scale = this->getScale();
+    auto x = left;
+    auto y = 0;
 
-    int h = int(NOTEBOOK_TAB_HEIGHT * this->getScale());
-
-    for (auto *btn : this->customButtons_) {
-        if (!btn->isVisible()) {
+    // set size of custom buttons (settings, user, ...)
+    for (auto *btn : this->customButtons_)
+    {
+        if (!btn->isVisible())
+        {
             continue;
         }
 
-        btn->setFixedSize(h, h);
+        btn->setFixedSize(tabHeight, tabHeight - 1);
         btn->move(x, 0);
-        x += h;
+        x += tabHeight;
     }
 
-    int tabHeight = static_cast<int>(NOTEBOOK_TAB_HEIGHT * scale);
-    bool first = true;
+    // layout tabs
+    /// Notebook tabs need to know if they are in the last row.
+    auto firstInBottomRow =
+        this->items_.size() ? &this->items_.front() : nullptr;
 
-    for (auto i = this->items_.begin(); i != this->items_.end(); i++) {
-        bool wrap =
-            !first &&
-            (((i + 1 == this->items_.end() && this->showAddButton_) ? tabHeight
-                                                                    : 0) +
-             x + i->tab->width()) > width();
+    for (auto &item : this->items_)
+    {
+        /// Break line if element doesn't fit.
+        auto isFirst = &item == &this->items_.front();
+        auto isLast = &item == &this->items_.back();
 
-        if (wrap) {
-            y += i->tab->height();
-            i->tab->moveAnimated(QPoint(xStart, y), animated);
-            x = i->tab->width() + xStart;
-        } else {
-            i->tab->moveAnimated(QPoint(x, y), animated);
-            x += i->tab->width();
+        auto fitsInLine =
+            ((isLast ? addButtonWidth : 0) + x + item.tab->width()) <= width();
+
+        if (!isFirst && !fitsInLine)
+        {
+            y += item.tab->height();
+            x = left;
+            firstInBottomRow = &item;
         }
 
-        x += int(scale * 1);
-
-        first = false;
+        /// Layout tab
+        item.tab->moveAnimated(QPoint(x, y), animated);
+        x += item.tab->width() + std::max<int>(1, int(scale * 1));
     }
 
-    if (this->showAddButton_) {
+    /// Update which tabs are in the last row
+    auto inLastRow = false;
+    for (const auto &item : this->items_)
+    {
+        if (&item == firstInBottomRow)
+        {
+            inLastRow = true;
+        }
+        item.tab->setInLastRow(inLastRow);
+    }
+
+    // move misc buttons
+    if (this->showAddButton_)
+    {
         this->addButton_->move(x, y);
     }
 
-    if (this->lineY_ != y + tabHeight) {
+    if (this->lineY_ != y + tabHeight)
+    {
         this->lineY_ = y + tabHeight;
         this->update();
     }
 
-    y += int(3 * scale);
+    /// Increment for the line at the bottom
+    y += int(2 * scale);
 
-    for (auto &i : this->items_) {
+    // raise elements
+    for (auto &i : this->items_)
+    {
         i.tab->raise();
     }
 
-    if (this->showAddButton_) {
+    if (this->showAddButton_)
+    {
         this->addButton_->raise();
     }
 
-    if (this->selectedPage_ != nullptr) {
+    // set page bounds
+    if (this->selectedPage_ != nullptr)
+    {
         this->selectedPage_->move(0, y + tabHeight);
         this->selectedPage_->resize(width(), height() - y - tabHeight);
         this->selectedPage_->raise();
@@ -394,8 +452,8 @@ void Notebook::paintEvent(QPaintEvent *event)
     BaseWidget::paintEvent(event);
 
     QPainter painter(this);
-    painter.fillRect(0, this->lineY_, this->width(),
-                     (int)(3 * this->getScale()), this->theme->tabs.bottomLine);
+    painter.fillRect(0, this->lineY_, this->width(), int(2 * this->scale()),
+                     this->theme->tabs.bottomLine);
 }
 
 NotebookButton *Notebook::getAddButton()
@@ -415,8 +473,10 @@ NotebookButton *Notebook::addCustomButton()
 
 NotebookTab *Notebook::getTabFromPage(QWidget *page)
 {
-    for (auto &it : this->items_) {
-        if (it.page == page) {
+    for (auto &it : this->items_)
+    {
+        if (it.page == page)
+        {
             return it.tab;
         }
     }
@@ -427,13 +487,13 @@ NotebookTab *Notebook::getTabFromPage(QWidget *page)
 SplitNotebook::SplitNotebook(Window *parent)
     : Notebook(parent)
 {
-    this->connect(this->getAddButton(), &NotebookButton::clicked, [this]() {
+    this->connect(this->getAddButton(), &NotebookButton::leftClicked, [this]() {
         QTimer::singleShot(80, this, [this] { this->addPage(true); });
     });
 
-    bool customFrame = parent->hasCustomWindowFrame();
-
-    if (!customFrame) {
+    // add custom buttons if they are not in the parent window frame
+    if (!parent->hasCustomWindowFrame())
+    {
         this->addCustomButtons();
     }
 }
@@ -451,7 +511,7 @@ void SplitNotebook::addCustomButtons()
 
     settingsBtn->setIcon(NotebookButton::Settings);
 
-    QObject::connect(settingsBtn, &NotebookButton::clicked,
+    QObject::connect(settingsBtn, &NotebookButton::leftClicked,
                      [] { getApp()->windows->showSettingsDialog(); });
 
     // account
@@ -462,7 +522,7 @@ void SplitNotebook::addCustomButtons()
         this->connections_);
 
     userBtn->setIcon(NotebookButton::User);
-    QObject::connect(userBtn, &NotebookButton::clicked, [this, userBtn] {
+    QObject::connect(userBtn, &NotebookButton::leftClicked, [this, userBtn] {
         getApp()->windows->showAccountSelectPopup(
             this->mapToGlobal(userBtn->rect().bottomRight()));
     });
@@ -475,8 +535,8 @@ void SplitNotebook::addCustomButtons()
 
 SplitContainer *SplitNotebook::addPage(bool select)
 {
-    SplitContainer *container = new SplitContainer(this);
-    auto *tab = Notebook::addPage(container, QString(), select);
+    auto container = new SplitContainer(this);
+    auto tab = Notebook::addPage(container, QString(), select);
     container->setTab(tab);
     tab->setParent(this);
     tab->show();
@@ -493,10 +553,12 @@ SplitContainer *SplitNotebook::getOrAddSelectedPage()
 
 void SplitNotebook::select(QWidget *page)
 {
-    if (auto selectedPage = this->getSelectedPage()) {
-        if (auto splitContainer =
-                dynamic_cast<SplitContainer *>(selectedPage)) {
-            for (auto split : splitContainer->getSplits()) {
+    if (auto selectedPage = this->getSelectedPage())
+    {
+        if (auto splitContainer = dynamic_cast<SplitContainer *>(selectedPage))
+        {
+            for (auto split : splitContainer->getSplits())
+            {
                 split->updateLastReadMessage();
             }
         }

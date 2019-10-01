@@ -3,7 +3,7 @@
 #include "util/RapidJsonSerializeQString.hpp"
 
 #include <rapidjson/document.h>
-#include <pajlada/settings/serialize.hpp>
+#include <pajlada/serialize.hpp>
 
 #include <cassert>
 #include <string>
@@ -24,8 +24,7 @@ namespace rj {
     {
         assert(obj.IsObject());
 
-        addMember(obj, key, pajlada::Settings::Serialize<Type>::get(value, a),
-                  a);
+        addMember(obj, key, pajlada::Serialize<Type>::get(value, a), a);
     }
 
     template <>
@@ -45,8 +44,7 @@ namespace rj {
 
         auto &a = obj.GetAllocator();
 
-        addMember(obj, key, pajlada::Settings::Serialize<Type>::get(value, a),
-                  a);
+        addMember(obj, key, pajlada::Serialize<Type>::get(value, a), a);
     }
 
     template <>
@@ -66,26 +64,29 @@ namespace rj {
     {
         assert(arr.IsArray());
 
-        arr.PushBack(pajlada::Settings::Serialize<Type>::get(value, a), a);
+        arr.PushBack(pajlada::Serialize<Type>::get(value, a), a);
     }
 
     template <typename Type>
     bool getSafe(const rapidjson::Value &obj, const char *key, Type &out)
     {
-        if (!obj.IsObject()) {
+        if (!obj.IsObject())
+        {
             return false;
         }
 
-        if (!obj.HasMember(key)) {
+        if (!obj.HasMember(key))
+        {
             return false;
         }
 
-        if (obj.IsNull()) {
+        if (obj.IsNull())
+        {
             return false;
         }
 
         bool error = false;
-        out = pajlada::Settings::Deserialize<Type>::get(obj[key], &error);
+        out = pajlada::Deserialize<Type>::get(obj[key], &error);
 
         return !error;
     }
@@ -94,7 +95,7 @@ namespace rj {
     bool getSafe(const rapidjson::Value &value, Type &out)
     {
         bool error = false;
-        out = pajlada::Settings::Deserialize<Type>::get(value, &error);
+        out = pajlada::Deserialize<Type>::get(value, &error);
 
         return !error;
     }

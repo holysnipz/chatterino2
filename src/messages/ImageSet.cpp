@@ -21,8 +21,10 @@ ImageSet::ImageSet(const ImagePtr &image1, const ImagePtr &image2,
 
 ImageSet::ImageSet(const Url &image1, const Url &image2, const Url &image3)
     : imageX1_(Image::fromUrl(image1, 1))
-    , imageX2_(Image::fromUrl(image2, 0.5))
-    , imageX3_(Image::fromUrl(image3, 0.25))
+    , imageX2_(image2.string.isEmpty() ? Image::getEmpty()
+                                       : Image::fromUrl(image2, 0.5))
+    , imageX3_(image3.string.isEmpty() ? Image::getEmpty()
+                                       : Image::fromUrl(image3, 0.25))
 {
 }
 
@@ -56,24 +58,55 @@ const ImagePtr &ImageSet::getImage3() const
     return this->imageX3_;
 }
 
-const ImagePtr &ImageSet::getImage(float scale) const
+const std::shared_ptr<Image> &getImagePriv(const ImageSet &set, float scale)
 {
+    scale *= getSettings()->emoteScale;
+
     int quality = 1;
 
-    if (scale > 2.999)
+    if (scale > 2.001f)
         quality = 3;
-    else if (scale > 1.5)
+    else if (scale > 1.001f)
         quality = 2;
 
-    if (!this->imageX3_->isEmpty() && quality == 3) {
+    if (!set.getImage3()->isEmpty() && quality == 3)
+    {
+        return set.getImage3();
+    }
+
+    if (!set.getImage2()->isEmpty() && quality >= 2)
+    {
+        return set.getImage2();
+    }
+
+    return set.getImage1();
+}
+
+const ImagePtr &ImageSet::getImageOrLoaded(float scale) const
+{
+    auto &&result = getImagePriv(*this, scale);
+
+    // get best image based on scale
+    result->load();
+
+    // prefer other image if selected image is not loaded yet
+    if (result->loaded())
+        return result;
+    else if (this->imageX3_ && !this->imageX3_->isEmpty() &&
+             this->imageX3_->loaded())
         return this->imageX3_;
-    }
-
-    if (!this->imageX2_->isEmpty() && quality == 2) {
+    else if (this->imageX2_ && !this->imageX2_->isEmpty() &&
+             this->imageX2_->loaded())
         return this->imageX2_;
-    }
+    else if (this->imageX1_->loaded())
+        return this->imageX1_;
+    else
+        return result;
+}
 
-    return this->imageX1_;
+const ImagePtr &ImageSet::getImage(float scale) const
+{
+    return getImagePriv(*this, scale);
 }
 
 bool ImageSet::operator==(const ImageSet &other) const

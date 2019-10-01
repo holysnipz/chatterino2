@@ -29,13 +29,14 @@ int AccountModel::beforeInsert(const std::shared_ptr<Account> &item,
                                std::vector<QStandardItem *> &row,
                                int proposedIndex)
 {
-    if (this->categoryCount_[item->getCategory()]++ == 0) {
-        auto row = this->createRow();
+    if (this->categoryCount_[item->getCategory()]++ == 0)
+    {
+        auto newRow = this->createRow();
 
-        setStringItem(row[0], item->getCategory(), false, false);
-        row[0]->setData(QFont("Segoe UI Light", 16), Qt::FontRole);
+        setStringItem(newRow[0], item->getCategory(), false, false);
+        newRow[0]->setData(QFont("Segoe UI Light", 16), Qt::FontRole);
 
-        this->insertCustomRow(std::move(row), proposedIndex);
+        this->insertCustomRow(std::move(newRow), proposedIndex);
 
         return proposedIndex + 1;
     }
@@ -49,10 +50,13 @@ void AccountModel::afterRemoved(const std::shared_ptr<Account> &item,
     auto it = this->categoryCount_.find(item->getCategory());
     assert(it != this->categoryCount_.end());
 
-    if (it->second <= 1) {
+    if (it->second <= 1)
+    {
         this->categoryCount_.erase(it);
         this->removeCustomRow(index - 1);
-    } else {
+    }
+    else
+    {
         it->second--;
     }
 }

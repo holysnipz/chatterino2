@@ -22,10 +22,10 @@ EditableModelView::EditableModelView(QAbstractTableModel *model)
     // create layout
     QVBoxLayout *vbox = new QVBoxLayout(this);
     vbox->setMargin(0);
-    vbox->addWidget(this->tableView_);
 
     // create button layout
     QHBoxLayout *buttons = new QHBoxLayout(this);
+    this->buttons_ = buttons;
     vbox->addLayout(buttons);
 
     // add
@@ -40,10 +40,16 @@ EditableModelView::EditableModelView(QAbstractTableModel *model)
     QObject::connect(remove, &QPushButton::clicked, [this] {
         QModelIndexList list;
         while ((list = this->getTableView()->selectionModel()->selectedRows(0))
-                   .length() > 0) {
+                   .length() > 0)
+        {
             model_->removeRow(list[0].row());
         }
     });
+
+    buttons->addStretch();
+
+    // add tableview
+    vbox->addWidget(this->tableView_);
 
     // finish button layout
     buttons->addStretch(1);
@@ -52,8 +58,10 @@ EditableModelView::EditableModelView(QAbstractTableModel *model)
 void EditableModelView::setTitles(std::initializer_list<QString> titles)
 {
     int i = 0;
-    for (const QString &title : titles) {
-        if (this->model_->columnCount() == i) {
+    for (const QString &title : titles)
+    {
+        if (this->model_->columnCount() == i)
+        {
             break;
         }
 
@@ -70,6 +78,20 @@ QTableView *EditableModelView::getTableView()
 QAbstractTableModel *EditableModelView::getModel()
 {
     return this->model_;
+}
+
+void EditableModelView::addCustomButton(QWidget *widget)
+{
+    this->buttons_->addWidget(widget);
+}
+
+void EditableModelView::addRegexHelpLink()
+{
+    auto regexHelpLabel =
+        new QLabel("<a href='https://chatterino.com/help/regex'><span "
+                   "style='color:#99f'>regex info</span></a>");
+    regexHelpLabel->setOpenExternalLinks(true);
+    this->addCustomButton(regexHelpLabel);
 }
 
 }  // namespace chatterino

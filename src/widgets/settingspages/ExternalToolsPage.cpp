@@ -14,8 +14,6 @@ namespace chatterino {
 ExternalToolsPage::ExternalToolsPage()
     : SettingsPage("External tools", ":/settings/externaltools.svg")
 {
-    auto app = getApp();
-
     LayoutCreator<ExternalToolsPage> layoutCreator(this);
     auto layout = layoutCreator.setLayoutType<QVBoxLayout>();
 
@@ -32,8 +30,9 @@ ExternalToolsPage::ExternalToolsPage()
         description->setStyleSheet("color: #bbb");
 
         auto links = new QLabel(
-            createNamedLink("https://streamlink.github.io/", "Website") + " " +
-            createNamedLink(
+            formatRichNamedLink("https://streamlink.github.io/", "Website") +
+            " " +
+            formatRichNamedLink(
                 "https://github.com/streamlink/streamlink/releases/latest",
                 "Download"));
         links->setTextFormat(Qt::RichText);

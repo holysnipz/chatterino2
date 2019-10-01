@@ -22,10 +22,11 @@ ChatterinoBadges::ChatterinoBadges()
 {
 }
 
-boost::optional<EmotePtr> ChatterinoBadges::getBadge(const UserName &username)
+boost::optional<EmotePtr> ChatterinoBadges::getBadge(const UserId &id)
 {
-    auto it = badgeMap.find(username.string);
-    if (it != badgeMap.end()) {
+    auto it = badgeMap.find(id.string);
+    if (it != badgeMap.end())
+    {
         return emotes[it->second];
     }
     return boost::none;
@@ -33,32 +34,35 @@ boost::optional<EmotePtr> ChatterinoBadges::getBadge(const UserName &username)
 
 void ChatterinoBadges::loadChatterinoBadges()
 {
-    static QUrl url("https://fourtf.com/chatterino/badges.json");
+    static QUrl url("https://api.chatterino.com/badges");
 
-    NetworkRequest req(url);
-    req.setCaller(QThread::currentThread());
+    NetworkRequest(url)
+        .onSuccess([this](auto result) -> Outcome {
+            auto jsonRoot = result.parseJson();
+            int index = 0;
+            for (const auto &jsonBadge_ : jsonRoot.value("badges").toArray())
+            {
+                auto jsonBadge = jsonBadge_.toObject();
+                auto emote = Emote{
+                    EmoteName{},
+                    ImageSet{Url{jsonBadge.value("image1").toString()},
+                             Url{jsonBadge.value("image2").toString()},
+                             Url{jsonBadge.value("image3").toString()}},
+                    Tooltip{jsonBadge.value("tooltip").toString()}, Url{}};
 
-    req.onSuccess([this](auto result) -> Outcome {
-        auto jsonRoot = result.parseJson();
-        int index = 0;
-        for (const auto &jsonBadge_ : jsonRoot.value("badges").toArray()) {
-            auto jsonBadge = jsonBadge_.toObject();
-            auto emote = Emote{
-                EmoteName{}, ImageSet{Url{jsonBadge.value("image").toString()}},
-                Tooltip{jsonBadge.value("tooltip").toString()}, Url{}};
+                emotes.push_back(
+                    std::make_shared<const Emote>(std::move(emote)));
 
-            emotes.push_back(std::make_shared<const Emote>(std::move(emote)));
-
-            for (const auto &user : jsonBadge.value("users").toArray()) {
-                badgeMap[user.toString()] = index;
+                for (const auto &user : jsonBadge.value("users").toArray())
+                {
+                    badgeMap[user.toString()] = index;
+                }
+                ++index;
             }
-            ++index;
-        }
 
-        return Success;
-    });
-
-    req.execute();
+            return Success;
+        })
+        .execute();
 }
 
 }  // namespace chatterino

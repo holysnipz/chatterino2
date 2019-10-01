@@ -2,25 +2,27 @@
 Chatterino 2
 ============
 
-Chatterino 2 is the second installment of the Twitch chat client series "Chatterino". For now you can check out Chatterino 1 at [https://chatterino.com](https://chatterino.com).
+Chatterino 2 is the second installment of the Twitch chat client series "Chatterino".
 
-## Downloading
-You can download the Chatterino 2 Beta over [here](https://chatterino.com/download/Chatterino2BetaInstaller.exe)
+## Download
+Current releases are available at [https://chatterino.com](https://chatterino.com).
+
+## Nightly build
+You can download the latest Chatterino 2 build over [here](https://github.com/Chatterino/chatterino2/releases/tag/nightly-build)
 
 You might also need to install the [VC++ 2017 Redistributable](https://aka.ms/vs/15/release/vc_redist.x64.exe) from Microsoft if you do not have it installed already.  
 If you still receive an error about `MSVCR120.dll missing`, then you should install the [VC++ 2013 Restributable](https://download.microsoft.com/download/2/E/6/2E61CFA4-993B-4DD4-91DA-3737CD5CD6E3/vcredist_x64.exe
 ).
 
-Releases for linux and mac will follow soon™
-
 ## Building
 To get source code with required submodules run:
 ```
-git clone --recursive https://github.com/fourtf/chatterino2.git
+git clone --recurse-submodules https://github.com/Chatterino/chatterino2.git
 ```
 or
 ```
-git clone https://github.com/fourtf/chatterino2.git
+git clone https://github.com/Chatterino/chatterino2.git
+cd chatterino2
 git submodule update --init --recursive
 ```
 
@@ -31,7 +33,7 @@ git submodule update --init --recursive
 [Building on Mac](../master/BUILDING_ON_MAC.md)
 
 ## Code style
-The code is formated using clang format in Qt Creator. [.clang-format](https://github.com/fourtf/chatterino2/blob/master/.clang-format) contains the style file for clang format.
+The code is formatted using clang format in Qt Creator. [.clang-format](https://github.com/Chatterino/chatterino2/blob/master/.clang-format) contains the style file for clang format.
 
 ### Get it automated with QT Creator + Beautifier + Clang Format
 1. Download LLVM: http://releases.llvm.org/6.0.1/LLVM-6.0.1-win64.exe
@@ -44,5 +46,3 @@ The code is formated using clang format in Qt Creator. [.clang-format](https://g
 
 Qt creator should now format the documents when saving it.
 
-### CodeScene
-[![](https://codescene.io/projects/3004/status.svg) Get more details at **codescene.io**.](https://codescene.io/projects/3004/jobs/latest-successful/results)

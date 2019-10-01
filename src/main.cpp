@@ -1,12 +1,13 @@
-#include "BrowserExtension.hpp"
-#include "RunGui.hpp"
-#include "singletons/Paths.hpp"
-#include "singletons/Settings.hpp"
-#include "util/IncognitoBrowser.hpp"
-
 #include <QApplication>
 #include <QStringList>
 #include <memory>
+
+#include "BrowserExtension.hpp"
+#include "RunGui.hpp"
+#include "common/Args.hpp"
+#include "singletons/Paths.hpp"
+#include "singletons/Settings.hpp"
+#include "util/IncognitoBrowser.hpp"
 
 using namespace chatterino;
 
@@ -20,11 +21,15 @@ int main(int argc, char **argv)
                    [&](auto s) { return s; });
 
     // run in gui mode or browser extension host mode
-    if (shouldRunBrowserExtensionHost(args)) {
+    if (shouldRunBrowserExtensionHost(args))
+    {
         runBrowserExtensionHost();
-    } else {
+    }
+    else
+    {
+        initArgs(args);
         Paths paths;
-        Settings settings(paths);
+        Settings settings(paths.settingsDirectory);
 
         runGui(a, paths, settings);
     }

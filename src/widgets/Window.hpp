@@ -25,8 +25,6 @@ public:
     WindowType getType();
     SplitNotebook &getNotebook();
 
-    void repaintVisibleChatWidgets(Channel *channel = nullptr);
-
     pajlada::Signals::NoArgSignal closed;
 
 protected:
@@ -40,6 +38,7 @@ private:
     void addShortcuts();
     void addLayout();
     void onAccountSelected();
+    void addMenuBar();
 
     WindowType type_;
 

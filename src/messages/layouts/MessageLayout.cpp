@@ -64,7 +64,8 @@ bool MessageLayout::layout(int width, float scale, MessageElementFlags flags)
     this->currentLayoutWidth_ = width;
 
     // check if layout state changed
-    if (this->layoutState_ != app->windows->getGeneration()) {
+    if (this->layoutState_ != app->windows->getGeneration())
+    {
         layoutRequired = true;
         this->flags.set(MessageLayoutFlag::RequiresBufferUpdate);
         this->layoutState_ = app->windows->getGeneration();
@@ -82,13 +83,15 @@ bool MessageLayout::layout(int width, float scale, MessageElementFlags flags)
     layoutRequired |= this->scale_ != scale;
     this->scale_ = scale;
 
-    if (!layoutRequired) {
+    if (!layoutRequired)
+    {
         return false;
     }
 
     int oldHeight = this->container_->getHeight();
     this->actuallyLayout(width, flags);
-    if (widthChanged || this->container_->getHeight() != oldHeight) {
+    if (widthChanged || this->container_->getHeight() != oldHeight)
+    {
         this->deleteBuffer();
     }
     this->invalidateBuffer();
@@ -96,12 +99,14 @@ bool MessageLayout::layout(int width, float scale, MessageElementFlags flags)
     return true;
 }
 
-void MessageLayout::actuallyLayout(int width, MessageElementFlags _flags)
+void MessageLayout::actuallyLayout(int width, MessageElementFlags flags)
 {
+    this->layoutCount_++;
+
     auto messageFlags = this->message_->flags;
 
     if (this->flags.has(MessageLayoutFlag::Expanded) ||
-        (_flags.has(MessageElementFlag::ModeratorTools) &&
+        (flags.has(MessageElementFlag::ModeratorTools) &&
          !this->message_->flags.has(MessageFlag::Disabled)))  //
     {
         messageFlags.unset(MessageFlag::Collapsed);
@@ -109,11 +114,25 @@ void MessageLayout::actuallyLayout(int width, MessageElementFlags _flags)
 
     this->container_->begin(width, this->scale_, messageFlags);
 
-    for (const auto &element : this->message_->elements) {
-        element->addToContainer(*this->container_, _flags);
+    for (const auto &element : this->message_->elements)
+    {
+        if (getSettings()->hideModerated &&
+            this->message_->flags.has(MessageFlag::Disabled))
+        {
+            continue;
+        }
+
+        if (getSettings()->hideModerationActions &&
+            this->message_->flags.has(MessageFlag::Timeout))
+        {
+            continue;
+        }
+
+        element->addToContainer(*this->container_, flags);
     }
 
-    if (this->height_ != this->container_->getHeight()) {
+    if (this->height_ != this->container_->getHeight())
+    {
         this->deleteBuffer();
     }
 
@@ -122,7 +141,8 @@ void MessageLayout::actuallyLayout(int width, MessageElementFlags _flags)
 
     // collapsed state
     this->flags.unset(MessageLayoutFlag::Collapsed);
-    if (this->container_->isCollapsed()) {
+    if (this->container_->isCollapsed())
+    {
         this->flags.set(MessageLayoutFlag::Collapsed);
     }
 }
@@ -136,7 +156,8 @@ void MessageLayout::paint(QPainter &painter, int width, int y, int messageIndex,
     QPixmap *pixmap = this->buffer_.get();
 
     // create new buffer if required
-    if (!pixmap) {
+    if (!pixmap)
+    {
 #ifdef Q_OS_MACOS
         pixmap = new QPixmap(int(width * painter.device()->devicePixelRatioF()),
                              int(container_->getHeight() *
@@ -152,7 +173,8 @@ void MessageLayout::paint(QPainter &painter, int width, int y, int messageIndex,
         DebugCount::increase("message drawing buffers");
     }
 
-    if (!this->bufferValid_ || !selection.isEmpty()) {
+    if (!this->bufferValid_ || !selection.isEmpty())
+    {
         this->updateBuffer(pixmap, messageIndex, selection);
     }
 
@@ -165,28 +187,43 @@ void MessageLayout::paint(QPainter &painter, int width, int y, int messageIndex,
     this->container_->paintAnimatedElements(painter, y);
 
     // draw disabled
-    if (this->message_->flags.has(MessageFlag::Disabled)) {
+    if (this->message_->flags.has(MessageFlag::Disabled))
+    {
+        painter.fillRect(0, y, pixmap->width(), pixmap->height(),
+                         app->themes->messages.disabled);
+        //        painter.fillRect(0, y, pixmap->width(), pixmap->height(),
+        //                         QBrush(QColor(64, 64, 64, 64)));
+    }
+
+    if (this->message_->flags.has(MessageFlag::RecentMessage))
+    {
         painter.fillRect(0, y, pixmap->width(), pixmap->height(),
                          app->themes->messages.disabled);
     }
 
     // draw selection
-    if (!selection.isEmpty()) {
+    if (!selection.isEmpty())
+    {
         this->container_->paintSelection(painter, messageIndex, selection, y);
     }
 
     // draw message seperation line
-    if (getSettings()->separateMessages.getValue()) {
-        painter.fillRect(0, y, this->container_->getWidth(), 1,
+    if (getSettings()->separateMessages.getValue())
+    {
+        painter.fillRect(0, y, this->container_->getWidth() + 64, 1,
                          app->themes->splits.messageSeperator);
     }
 
     // draw last read message line
-    if (isLastReadMessage) {
+    if (isLastReadMessage)
+    {
         QColor color;
-        if (getSettings()->lastMessageColor != "") {
+        if (getSettings()->lastMessageColor != "")
+        {
             color = QColor(getSettings()->lastMessageColor.getValue());
-        } else {
+        }
+        else
+        {
             color =
                 isWindowFocused
                     ? app->themes->tabs.selected.backgrounds.regular.color()
@@ -209,21 +246,34 @@ void MessageLayout::updateBuffer(QPixmap *buffer, int /*messageIndex*/,
     auto app = getApp();
 
     QPainter painter(buffer);
-
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
     // draw background
-    QColor backgroundColor;
-    if (this->message_->flags.has(MessageFlag::Highlighted)) {
+    QColor backgroundColor = app->themes->messages.backgrounds.regular;
+    if ((this->message_->flags.has(MessageFlag::Highlighted) ||
+         this->message_->flags.has(MessageFlag::HighlightedWhisper)) &&
+        !this->flags.has(MessageLayoutFlag::IgnoreHighlights))
+    {
         backgroundColor = app->themes->messages.backgrounds.highlighted;
-    } else if (this->message_->flags.has(MessageFlag::Subscription)) {
-        backgroundColor = app->themes->messages.backgrounds.subscription;
-    } else if (getSettings()->alternateMessageBackground.getValue() &&
-               this->flags.has(MessageLayoutFlag::AlternateBackground)) {
-        backgroundColor = app->themes->messages.backgrounds.alternate;
-    } else {
-        backgroundColor = app->themes->messages.backgrounds.regular;
     }
+    else if (this->message_->flags.has(MessageFlag::Subscription))
+    {
+        backgroundColor = app->themes->messages.backgrounds.subscription;
+    }
+    else if (getSettings()->alternateMessages.getValue() &&
+             this->flags.has(MessageLayoutFlag::AlternateBackground))
+    {
+        backgroundColor = app->themes->messages.backgrounds.alternate;
+    }
+    else if (this->message_->flags.has(MessageFlag::AutoMod))
+    {
+        backgroundColor = QColor("#404040");
+    }
+    else if (this->message_->flags.has(MessageFlag::Debug))
+    {
+        backgroundColor = QColor("#4A273D");
+    }
+
     painter.fillRect(buffer->rect(), backgroundColor);
 
     // draw message
@@ -238,8 +288,10 @@ void MessageLayout::updateBuffer(QPixmap *buffer, int /*messageIndex*/,
     QTextOption option;
     option.setAlignment(Qt::AlignRight | Qt::AlignTop);
 
-    painter.drawText(QRectF(1, 1, this->container.getWidth() - 3, 1000),
-                     QString::number(++this->bufferUpdatedCount), option);
+    painter.drawText(QRectF(1, 1, this->container_->getWidth() - 3, 1000),
+                     QString::number(this->layoutCount_) + ", " +
+                         QString::number(++this->bufferUpdatedCount_),
+                     option);
 #endif
 }
 
@@ -250,7 +302,8 @@ void MessageLayout::invalidateBuffer()
 
 void MessageLayout::deleteBuffer()
 {
-    if (this->buffer_ != nullptr) {
+    if (this->buffer_ != nullptr)
+    {
         DebugCount::decrease("message drawing buffers");
 
         this->buffer_ = nullptr;

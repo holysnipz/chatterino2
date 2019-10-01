@@ -1,6 +1,8 @@
 #pragma once
 
+#include "util/QObjectRef.hpp"
 #include "widgets/BaseWidget.hpp"
+#include "widgets/dialogs/EmotePopup.hpp"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -46,7 +48,7 @@ private:
     void openEmotePopup();
 
     Split *const split_;
-    std::shared_ptr<EmotePopup> emotePopup_;
+    QObjectRef<EmotePopup> emotePopup_;
 
     struct {
         ResizingTextEdit *textEdit;

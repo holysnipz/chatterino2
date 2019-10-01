@@ -8,6 +8,7 @@
 #include <QStandardPaths>
 #include <cassert>
 
+#include "common/Modes.hpp"
 #include "util/CombinePath.hpp"
 
 namespace chatterino {
@@ -32,12 +33,12 @@ bool Paths::createFolder(const QString &folderPath)
 
 bool Paths::isPortable()
 {
-    return this->portable_.get();
+    return Modes::getInstance().isPortable;
 }
 
 QString Paths::cacheDirectory()
 {
-    static QStringSetting cachePathSetting = [] {
+    static const auto pathSetting = [] {
         QStringSetting cachePathSetting("/cache/path");
 
         cachePathSetting.connect([](const auto &newPath, auto) {
@@ -47,9 +48,10 @@ QString Paths::cacheDirectory()
         return cachePathSetting;
     }();
 
-    auto path = cachePathSetting.getValue();
+    auto path = pathSetting.getValue();
 
-    if (path == "") {
+    if (path.isEmpty())
+    {
         return this->cacheDirectory_;
     }
 
@@ -83,14 +85,16 @@ void Paths::initAppDataDirectory()
 
     this->rootAppDataDirectory = [&]() -> QString {
         // portable
-        if (this->isPortable()) {
+        if (this->isPortable())
+        {
             return QCoreApplication::applicationDirPath();
         }
 
         // permanent installation
         QString path =
             QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-        if (path.isEmpty()) {
+        if (path.isEmpty())
+        {
             throw std::runtime_error(
                 "Error finding writable location for settings");
         }
@@ -117,7 +121,8 @@ void Paths::initSubDirectories()
         auto path = combinePath(this->rootAppDataDirectory,
                                 QString::fromStdString(name));
 
-        if (!QDir().mkpath(path)) {
+        if (!QDir().mkpath(path))
+        {
             throw std::runtime_error(
                 "Error creating appdata path %appdata%/chatterino/" + name);
         }
@@ -131,7 +136,7 @@ void Paths::initSubDirectories()
     this->messageLogDirectory = makePath("Logs");
     this->miscDirectory = makePath("Misc");
     this->twitchProfileAvatars = makePath("ProfileAvatars");
-    QDir().mkdir(this->twitchProfileAvatars + "/twitch");
+    //QDir().mkdir(this->twitchProfileAvatars + "/twitch");
 }
 
 Paths *getPaths()

@@ -8,17 +8,31 @@ namespace chatterino {
 
 const rapidjson::Value &getArgs(const rapidjson::Value &data)
 {
-    if (!data.HasMember("args")) {
+    if (!data.HasMember("args"))
+    {
         throw std::runtime_error("Missing member args");
     }
 
     const auto &args = data["args"];
 
-    if (!args.IsArray()) {
+    if (!args.IsArray())
+    {
         throw std::runtime_error("args must be an array");
     }
 
     return args;
+}
+
+const rapidjson::Value &getMsgID(const rapidjson::Value &data)
+{
+    if (!data.HasMember("msg_id"))
+    {
+        throw std::runtime_error("Missing member msg_id");
+    }
+
+    const auto &msgID = data["msg_id"];
+
+    return msgID;
 }
 
 bool getCreatedByUser(const rapidjson::Value &data, ActionUser &user)
@@ -43,12 +57,14 @@ rapidjson::Document createListenMessage(
 
     rapidjson::Value data(rapidjson::kObjectType);
 
-    if (account) {
+    if (account)
+    {
         rj::set(data, "auth_token", account->getOAuthToken(), a);
     }
 
     rapidjson::Value topics(rapidjson::kArrayType);
-    for (const auto &topic : topicsVec) {
+    for (const auto &topic : topicsVec)
+    {
         rj::add(topics, topic, a);
     }
 
@@ -70,7 +86,8 @@ rapidjson::Document createUnlistenMessage(
     rapidjson::Value data(rapidjson::kObjectType);
 
     rapidjson::Value topics(rapidjson::kArrayType);
-    for (const auto &topic : topicsVec) {
+    for (const auto &topic : topicsVec)
+    {
         rj::add(topics, topic, a);
     }
 
